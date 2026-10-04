@@ -1,0 +1,12 @@
+{
+  "name": "game:glass",
+  "opaque": false,
+  "solid": true,
+  "tickable": false,
+  "render": "transparent",
+  "textures": { "all": "glass" },
+  "components": {
+    "BreakTime": 0.3,
+    "Drops": []
+  }
+}

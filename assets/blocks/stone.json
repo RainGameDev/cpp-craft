@@ -1,0 +1,13 @@
+{
+  "name": "game:stone",
+  "opaque": true,
+  "solid": true,
+  "tickable": false,
+  "render": "cube",
+  "textures": { "all": "stone", "left": "furnace" },
+  "components": {
+    "BreakTime": 5.0,
+    "Drops": ["game:item:cobblestone"],
+    "BlastResistance": 30.0
+  }
+}

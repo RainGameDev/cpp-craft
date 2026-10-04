@@ -1,0 +1,10 @@
+{
+  "name": "brick",
+  "shader": "pbr_standard",
+  "albedoMap": "textures/dirt_albedo.png",
+  "normalMap": "textures/dirt_normal.png",
+  "metallicRoughnessMap": "textures/dirt_mr.png",
+  "baseColorFactor": [1.0, 1.0, 1.0, 1.0],
+  "metallicFactor": 1.0,
+  "roughnessFactor": 0.6
+}
