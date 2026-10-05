@@ -41,7 +41,8 @@ bool shouldShowFace(const VoxelDef &currentDef, const VoxelDef &neighborDef) {
 }
 
 MeshData meshChunk(const Chunk &chunk, const World &world,
-                   const VoxelRegistry &registry) {
+                   const VoxelRegistry &registry,
+                   const AtlasLayout &atlasLayout) {
   MeshData mesh;
   mesh.reserve(1024, 1536);
 
@@ -72,16 +73,16 @@ MeshData meshChunk(const Chunk &chunk, const World &world,
 
           const uint32_t baseVertex =
               static_cast<uint32_t>(mesh.vertices.size());
+          const auto &atlasCell = voxelDef.textureCoords[faceIndex];
           for (int cornerIndex = 0; cornerIndex < 4; ++cornerIndex) {
             Vertex vertex;
             vertex.pos = glm::vec3(worldX + face.corners[cornerIndex][0],
                                    worldY + face.corners[cornerIndex][1],
                                    worldZ + face.corners[cornerIndex][2]);
             vertex.color = glm::vec3(face.shade);
-            vertex.uv =
-                glm::vec2(FACE_UV[cornerIndex][0], FACE_UV[cornerIndex][1]);
-            // TODO: offset uv into voxelDef.tiles[faceIndex] atlas cell when
-            // atlas exists.
+            vertex.uv = glm::vec2(
+                (atlasCell[0] + FACE_UV[cornerIndex][0]) / atlasLayout.columns,
+                (atlasCell[1] + FACE_UV[cornerIndex][1]) / atlasLayout.rows);
             mesh.vertices.push_back(vertex);
           }
           mesh.indices.insert(mesh.indices.end(),

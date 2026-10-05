@@ -107,7 +107,8 @@ void VulkanApplication::rebuildChunk(const ChunkPos &chunkPos) {
     chunkMeshes.erase(chunkPos);
     return;
   }
-  MeshData meshData = meshChunk(*chunk, world, voxelRegistry);
+  MeshData meshData =
+      meshChunk(*chunk, world, voxelRegistry, voxelAtlas.layout());
   if (meshData.empty()) {
     chunkMeshes.erase(chunkPos);
     chunk->dirty = false;

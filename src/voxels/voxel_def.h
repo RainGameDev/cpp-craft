@@ -16,11 +16,11 @@ struct VoxelDef {
   bool solid = true;  // collision
   bool tickable = false;
   enum RenderMode { Cube, Cutout, Transparent, None } render = Cube;
-  // "all" takes last priority, eg if all is set then a"left" is defined, left
-  // overwrites the all texture for that face. 0: top, 1: left, 2: right, 3:
-  // bottom, 4: front, 5: back
+  // Face order matches the mesher: 0:+X (right), 1:-X (left), 2:+Y (top),
+  // 3:-Y (bottom), 4:+Z (front), 5:-Z (back). "all" fills every face first,
+  // then a named slot overwrites just its face.
   std::array<std::string, 6> textureIDs{};
-  // 0: top, 1: left, 2: right, 3: bottom, 4: front, 5: back
-  std::array<std::array<int32_t, 2>, 6> textureCoords;
+  // Same face order as above; each entry is the {column, row} atlas cell.
+  std::array<std::array<int32_t, 2>, 6> textureCoords{};
   std::unordered_map<std::string, nlohmann::json> components;
 };

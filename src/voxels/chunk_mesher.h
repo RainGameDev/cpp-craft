@@ -1,6 +1,7 @@
 #pragma once
 #include "rendering/vertex.h"
 #include "voxels/chunk.h"
+#include "voxels/texture_atlas.h"
 #include "voxels/world.h"
 #include <cstdint>
 #include <vector>
@@ -29,5 +30,6 @@ struct MesherFace {
 };
 
 MeshData meshChunk(const Chunk &chunk, const World &world,
-                   const VoxelRegistry &registry);
+                   const VoxelRegistry &registry,
+                   const AtlasLayout &atlasLayout);
 bool shouldShowFace(const VoxelDef &currentDef, const VoxelDef &neighborDef);

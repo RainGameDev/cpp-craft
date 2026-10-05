@@ -203,6 +203,96 @@ public:
             std::move(sampler)};
   }
 
+  TextureAsset &uploadFromPixels(const uint8_t *atlasPixels, int atlasWidth,
+                                 int atlasHeight,
+                                 const std::string &assetName) {
+    uint32_t mipLevels = static_cast<uint32_t>(std::floor(
+                             std::log2(std::max(atlasWidth, atlasHeight)))) +
+                         1;
+
+    auto mipChain =
+        generateMipChainSRGB(atlasPixels, atlasWidth, atlasHeight, mipLevels);
+
+    vk::DeviceSize totalSize = 0;
+    std::vector<vk::DeviceSize> mipOffsets(mipLevels);
+    for (uint32_t mipIndex = 0; mipIndex < mipLevels; mipIndex++) {
+      mipOffsets[mipIndex] = totalSize;
+      totalSize += mipChain[mipIndex].size();
+    }
+
+    vk::raii::Buffer stagingBuffer{nullptr};
+    vk::raii::DeviceMemory stagingMemory{nullptr};
+    createBuffer(totalSize, vk::BufferUsageFlagBits::eTransferSrc,
+                 vk::MemoryPropertyFlagBits::eHostVisible |
+                     vk::MemoryPropertyFlagBits::eHostCoherent,
+                 stagingBuffer, stagingMemory);
+
+    void *mappedPixels = stagingMemory.mapMemory(0, totalSize);
+    for (uint32_t mipIndex = 0; mipIndex < mipLevels; mipIndex++)
+      memcpy(static_cast<uint8_t *>(mappedPixels) + mipOffsets[mipIndex],
+             mipChain[mipIndex].data(), mipChain[mipIndex].size());
+    stagingMemory.unmapMemory();
+
+    vk::raii::Image image{nullptr};
+    vk::raii::DeviceMemory imageMemory{nullptr};
+    createImage(atlasWidth, atlasHeight, mipLevels, vk::Format::eR8G8B8A8Srgb,
+                vk::ImageTiling::eOptimal,
+                vk::ImageUsageFlagBits::eSampled |
+                    vk::ImageUsageFlagBits::eTransferDst,
+                image, imageMemory);
+
+    transitionImageLayout(image, mipLevels, vk::ImageLayout::eUndefined,
+                          vk::ImageLayout::eTransferDstOptimal);
+
+    auto commandBuffers = vk::raii::CommandBuffers(
+        device, {.commandPool = *commandPool,
+                 .level = vk::CommandBufferLevel::ePrimary,
+                 .commandBufferCount = 1});
+    auto copyCommand = std::move(commandBuffers.front());
+    copyCommand.begin(
+        {.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+
+    int mipWidth = atlasWidth, mipHeight = atlasHeight;
+    for (uint32_t mipIndex = 0; mipIndex < mipLevels; mipIndex++) {
+      vk::BufferImageCopy copyRegion{
+          .bufferOffset = mipOffsets[mipIndex],
+          .imageSubresource = {.aspectMask = vk::ImageAspectFlagBits::eColor,
+                               .mipLevel = mipIndex,
+                               .layerCount = 1},
+          .imageExtent = {static_cast<uint32_t>(mipWidth),
+                          static_cast<uint32_t>(mipHeight), 1}};
+      copyCommand.copyBufferToImage(*stagingBuffer, *image,
+                                    vk::ImageLayout::eTransferDstOptimal,
+                                    copyRegion);
+      mipWidth = std::max(1, mipWidth / 2);
+      mipHeight = std::max(1, mipHeight / 2);
+    }
+    copyCommand.end();
+
+    vk::SubmitInfo submitInfo{.commandBufferCount = 1,
+                              .pCommandBuffers = &*copyCommand};
+    queue.submit(submitInfo, nullptr);
+    queue.waitIdle();
+
+    transitionImageLayout(image, mipLevels,
+                          vk::ImageLayout::eTransferDstOptimal,
+                          vk::ImageLayout::eShaderReadOnlyOptimal);
+
+    vk::raii::ImageView imageView =
+        createImageView(image, vk::Format::eR8G8B8A8Srgb);
+    vk::raii::Sampler sampler = createSampler(mipLevels);
+
+    assets[assetName] = TextureAsset{static_cast<uint32_t>(atlasWidth),
+                                     static_cast<uint32_t>(atlasHeight),
+                                     mipLevels,
+                                     vk::Format::eR8G8B8A8Srgb,
+                                     std::move(image),
+                                     std::move(imageView),
+                                     std::move(imageMemory),
+                                     std::move(sampler)};
+    return assets[assetName];
+  }
+
 private:
   uint32_t findMemoryType(uint32_t typeFilter,
                           vk::MemoryPropertyFlags properties) {
@@ -424,9 +514,9 @@ private:
     auto limits = physicalDevice.getProperties().limits;
     return vk::raii::Sampler(
         device,
-        vk::SamplerCreateInfo{.magFilter = vk::Filter::eLinear,
-                              .minFilter = vk::Filter::eLinear,
-                              .mipmapMode = vk::SamplerMipmapMode::eLinear,
+        vk::SamplerCreateInfo{.magFilter = vk::Filter::eNearest,
+                              .minFilter = vk::Filter::eNearest,
+                              .mipmapMode = vk::SamplerMipmapMode::eNearest,
                               .addressModeU = vk::SamplerAddressMode::eRepeat,
                               .addressModeV = vk::SamplerAddressMode::eRepeat,
                               .anisotropyEnable = vk::True,

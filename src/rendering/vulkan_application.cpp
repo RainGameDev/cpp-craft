@@ -6,6 +6,7 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
+#include "voxels/texture_atlas.h"
 #include "voxels/voxel_registry.h"
 #include <GLFW/glfw3.h>
 #include <memory>
@@ -67,7 +68,13 @@ void VulkanApplication::initVulkan() {
     for (int worldX = 0; worldX < 32; ++worldX) {
       for (int worldZ = 0; worldZ < 32; ++worldZ) {
         for (int worldY = 0; worldY < 32; ++worldY) {
-          world.setBlock(worldX, worldY, worldZ, stoneId);
+          if (worldY > 16) {
+
+            world.setBlock(worldX, worldY, worldZ, dirtId);
+          } else {
+
+            world.setBlock(worldX, worldY, worldZ, stoneId);
+          }
         }
       }
     }
@@ -76,6 +83,15 @@ void VulkanApplication::initVulkan() {
   camera = Camera(glm::vec3(24.0f, 20.0f, -8.0f), glm::vec3(0.0f, 1.0f, 0.0f),
                   108.0f, -35.0f);
   assetManager.loadDirectory("assets/");
+
+  voxelAtlas = buildAtlas(voxelRegistry, "assets/textures");
+  resolveAtlasCoords(voxelRegistry, voxelAtlas);
+  auto *textureLoader =
+      dynamic_cast<TextureLoader *>(assetManager.getLoader<TextureAsset>());
+  if (!textureLoader)
+    throw std::runtime_error("voxel atlas: texture loader not registered");
+  textureLoader->uploadFromPixels(voxelAtlas.pixels.data(), voxelAtlas.width,
+                                  voxelAtlas.height, "voxel_atlas");
 
   createDescriptorPool();
   createUniformBuffers();

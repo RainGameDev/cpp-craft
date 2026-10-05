@@ -72,7 +72,7 @@ void VulkanApplication::createDescriptorSets() {
   descriptorSets = device.allocateDescriptorSets(allocInfo);
 
   auto *textures = assetManager.getLoader<TextureAsset>();
-  auto &tex = textures->getAsset("dirt_albedo");
+  auto &tex = textures->getAsset("voxel_atlas");
 
   for (size_t i = 0; i < maxConcurrentFrames; i++) {
     vk::DescriptorBufferInfo bufferInfo{.buffer = *uniformBuffers[i].buffer,

@@ -59,31 +59,36 @@ void VoxelRegistry::loadFromDir(const std::string &directory) {
     definition.render = parseRender(
         definitionJson.value("render", std::string("cube")), filePath);
 
-    for (auto &[textureType, textureName] :
-         definitionJson["textures"].items()) {
-      std::string type = textureType;
-      std::string name = textureName.get<std::string>();
+    // Face convention matches the mesher: 0:+X, 1:-X, 2:+Y, 3:-Y, 4:+Z, 5:-Z.
+    if (definitionJson.contains("textures")) {
+      for (auto &[textureType, textureName] :
+           definitionJson["textures"].items()) {
+        std::string type = textureType;
+        std::string name = textureName.get<std::string>();
 
-      if (type == "all") {
-        definition.textureIDs[0] = name;
-        definition.textureIDs[1] = name;
-        definition.textureIDs[2] = name;
-        definition.textureIDs[3] = name;
-        definition.textureIDs[4] = name;
-        definition.textureIDs[5] = name;
-      } else if (type == "top") {
-        definition.textureIDs[0] = name;
-      } else if (type == "left") {
-        definition.textureIDs[1] = name;
-      } else if (type == "right") {
-        definition.textureIDs[2] = name;
-      } else if (type == "bottom") {
-        definition.textureIDs[3] = name;
-      } else if (type == "front") {
-        definition.textureIDs[4] = name;
-      } else if (type == "back") {
-        definition.textureIDs[5] = name;
+        if (type == "all") {
+          definition.textureIDs.fill(name);
+        } else if (type == "top") {
+          definition.textureIDs[2] = name;
+        } else if (type == "bottom") {
+          definition.textureIDs[3] = name;
+        } else if (type == "left") {
+          definition.textureIDs[1] = name;
+        } else if (type == "right") {
+          definition.textureIDs[0] = name;
+        } else if (type == "front") {
+          definition.textureIDs[4] = name;
+        } else if (type == "back") {
+          definition.textureIDs[5] = name;
+        } else {
+          throw std::runtime_error("unknown texture slot '" + type + "' in " +
+                                   filePath);
+        }
       }
+    }
+    for (std::string &textureName : definition.textureIDs) {
+      if (textureName.empty())
+        textureName = "missing";
     }
     // definition.components[componentName] = componentValue;
 

@@ -10,6 +10,7 @@
 
 #include "../assets/asset_manager.h"
 #include "../voxels/voxel_registry.h"
+#include "../voxels/texture_atlas.h"
 #include "../voxels/world.h"
 #include "camera.h"
 #include "mesh.h"
@@ -90,6 +91,7 @@ private:
   uint32_t currentFrame = 0;
 
   World world;
+  Atlas voxelAtlas;
   std::unordered_map<ChunkPos, Mesh, ChunkPosHash> chunkMeshes;
 
   void initVulkan();

@@ -21,8 +21,11 @@ public:
     byId.push_back(std::move(air));
     byName["game:air"] = 0;
   }
+  std::vector<VoxelDef> &allDefinitions() { return byId; }
   void loadFromDir(const std::string &dir); // parse *.json, assign ids
   const VoxelDef &get(VoxelId id) const { return byId[id]; }
-  VoxelId idFromString(const std::string &blockName) const { return byName.at(blockName); }
+  VoxelId idFromString(const std::string &blockName) const {
+    return byName.at(blockName);
+  }
   size_t size() const { return byId.size(); }
 };
