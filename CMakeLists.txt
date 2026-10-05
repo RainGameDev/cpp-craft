@@ -24,6 +24,14 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(nlohmann_json)
 
 FetchContent_Declare(
+    FastNoise2
+    GIT_REPOSITORY https://github.com/Auburn/FastNoise2
+    GIT_TAG master
+)
+FetchContent_MakeAvailable(FastNoise2)
+
+
+FetchContent_Declare(
     stb
     GIT_REPOSITORY https://github.com/nothings/stb.git
     GIT_TAG master
@@ -66,7 +74,7 @@ target_include_directories(minecraft PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${stb_SOURCE_DIR}
 )
-target_link_libraries(minecraft PRIVATE glm::glm imgui Vulkan::Vulkan glfw nlohmann_json::nlohmann_json)
+target_link_libraries(minecraft PRIVATE glm::glm imgui Vulkan::Vulkan glfw nlohmann_json::nlohmann_json FastNoise)
 target_compile_definitions(minecraft PRIVATE VULKAN_HPP_NO_STRUCT_CONSTRUCTORS=1)
 
 if (MSVC)
