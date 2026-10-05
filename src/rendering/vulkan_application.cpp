@@ -6,9 +6,11 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
+#include "voxels/chunk_generator.h"
 #include "voxels/texture_atlas.h"
 #include "voxels/voxel_registry.h"
 #include <GLFW/glfw3.h>
+#include <cstdint>
 #include <memory>
 #include <print>
 
@@ -62,24 +64,7 @@ void VulkanApplication::initVulkan() {
     std::print("  [{}] {} opaque={} render={} BreakTime={}, ids={}\n", (int)i,
                d.name, d.opaque, (int)d.render, bt, texts);
   }
-  {
-    VoxelId dirtId = voxelRegistry.idFromString("game:dirt");
-    VoxelId stoneId = voxelRegistry.idFromString("game:stone");
-    for (int worldX = 0; worldX < 32; ++worldX) {
-      for (int worldZ = 0; worldZ < 32; ++worldZ) {
-        for (int worldY = 0; worldY < 32; ++worldY) {
-          if (worldY > 16) {
 
-            world.setBlock(worldX, worldY, worldZ, dirtId);
-          } else {
-
-            world.setBlock(worldX, worldY, worldZ, stoneId);
-          }
-        }
-      }
-    }
-    std::print("built test terrain: {} chunks\n", world.allChunks().size());
-  }
   camera = Camera(glm::vec3(24.0f, 20.0f, -8.0f), glm::vec3(0.0f, 1.0f, 0.0f),
                   108.0f, -35.0f);
   assetManager.loadDirectory("assets/");
@@ -114,12 +99,57 @@ void VulkanApplication::initVulkan() {
   initImGui();
 }
 
+const uint16_t RENDER_RADIUS = 2;
+
 void VulkanApplication::mainLoop() {
   float lastTime = 0.0f;
   while (!glfwWindowShouldClose(window)) {
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     float currentTime = static_cast<float>(glfwGetTime());
     float deltaTime = currentTime - lastTime;
     lastTime = currentTime;
+
+    glm::vec3 playerPos = camera.getPosition();
+    ChunkPos playerChunk = World::toChunkPos((int)std::floor(playerPos.x),
+                                             (int)std::floor(playerPos.y),
+                                             (int)std::floor(playerPos.z));
+
+    if (!streamInitialized || !(playerChunk == lastStreamedChunk)) {
+      streamInitialized = true;
+      lastStreamedChunk = playerChunk;
+      for (int radiusStep = 0; radiusStep <= RENDER_RADIUS; ++radiusStep)
+        for (ChunkPos column : spiralAround(playerChunk, radiusStep)) {
+          for (int columnY = 0; columnY <= playerChunk.y; ++columnY) {
+            ChunkPos target{column.x, columnY, column.z};
+            if (!world.hasChunk(target) && !world.isKnownEmpty(target))
+              world.ensureChunk(target,
+                                voxelRegistry); // generates, dirties neighbors
+          }
+        }
+
+      for (auto chunkIterator = world.allChunks().begin();
+           chunkIterator != world.allChunks().end();) {
+        ChunkPos loadedPos = chunkIterator->first;
+        if (horizontalDistance(loadedPos, playerChunk) > RENDER_RADIUS + 1) {
+          chunkMeshes.erase(loadedPos);
+          chunkIterator = world.allChunks().erase(chunkIterator);
+          world.evictEmpty(loadedPos);
+          for (ChunkPos neighborPos :
+               {ChunkPos{loadedPos.x - 1, loadedPos.y, loadedPos.z},
+                ChunkPos{loadedPos.x + 1, loadedPos.y, loadedPos.z},
+                ChunkPos{loadedPos.x, loadedPos.y - 1, loadedPos.z},
+                ChunkPos{loadedPos.x, loadedPos.y + 1, loadedPos.z},
+                ChunkPos{loadedPos.x, loadedPos.y, loadedPos.z - 1},
+                ChunkPos{loadedPos.x, loadedPos.y, loadedPos.z + 1}}) {
+            Chunk *neighborChunk = world.getChunk(neighborPos);
+            if (neighborChunk)
+              neighborChunk->dirty = true;
+          }
+        } else {
+          ++chunkIterator;
+        }
+      }
+    }
 
     glfwPollEvents();
     processInput(window, camera, deltaTime);
@@ -142,6 +172,13 @@ void VulkanApplication::mainLoop() {
     glm::vec3 position = camera.getPosition();
     ImGui::Text("Position: %.2f, %.2f, %.2f", position.x, position.y,
                 position.z);
+    ChunkPos overlayChunk = World::toChunkPos((int)std::floor(position.x),
+                                              (int)std::floor(position.y),
+                                              (int)std::floor(position.z));
+    ImGui::Text("Chunk: %d, %d, %d", overlayChunk.x, overlayChunk.y,
+                overlayChunk.z);
+    ImGui::Text("Chunks: %zu (+%zu empty known)", world.chunkCount(),
+                world.knownEmptyCount());
     ImGui::End();
 
     ImGui::Render();
@@ -171,6 +208,11 @@ void VulkanApplication::processInput(GLFWwindow *window, Camera &camera,
     inputDir.x -= 1.0;
   if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
     inputDir.x += 1.0;
+
+  if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+    inputDir.y += 1.0;
+  if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
+    inputDir.y -= 1.0;
 
   camera.processKeyboard(inputDir, deltaTime);
 }

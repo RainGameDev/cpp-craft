@@ -1,7 +1,7 @@
 #pragma once
 #include "voxel_def.h"
 #include <array>
-inline constexpr int CW = 16, CH = 16, CD = 16;
+inline constexpr int CW = 32, CH = 32, CD = 32;
 
 struct ChunkPos {
   int x, y, z;
@@ -17,6 +17,7 @@ struct Chunk {
   ChunkPos pos{};
   std::array<VoxelId, CW * CH * CD> voxels{};
   bool dirty = true;
+  bool generated = false;
   static size_t idx(int x, int y, int z) {
     return (size_t)((y * CD + z) * CW + x);
   }

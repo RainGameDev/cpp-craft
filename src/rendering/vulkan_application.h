@@ -93,6 +93,8 @@ private:
   World world;
   Atlas voxelAtlas;
   std::unordered_map<ChunkPos, Mesh, ChunkPosHash> chunkMeshes;
+  ChunkPos lastStreamedChunk{};
+  bool streamInitialized = false;
 
   void initVulkan();
   void mainLoop();

@@ -2,6 +2,7 @@
 #include "voxels/chunk.h"
 #include "voxels/voxel_def.h"
 #include <unordered_map>
+#include <unordered_set>
 
 // Integer floor division that handles negatives
 inline int floorDiv(int value, int divisor) {
@@ -15,8 +16,13 @@ inline int floorMod(int value, int divisor) {
   return value - floorDiv(value, divisor) * divisor;
 }
 
+class VoxelRegistry;
+
 class World {
   std::unordered_map<ChunkPos, Chunk, ChunkPosHash> storedChunks;
+  // Positions proven to generate all-air. Missing chunks already read as
+  // AIR, so these are remembered instead of stored to bound memory.
+  std::unordered_set<ChunkPos, ChunkPosHash> knownEmptyChunks;
 
   void markNeighborDirty(ChunkPos chunkPos);
 
@@ -43,6 +49,14 @@ public:
     chunkIterator->second.pos = chunkPos;
     return chunkIterator->second;
   }
+  Chunk *ensureChunk(ChunkPos chunkPos, const VoxelRegistry &registry);
+  bool isKnownEmpty(ChunkPos chunkPos) const {
+    return knownEmptyChunks.contains(chunkPos);
+  }
+  size_t chunkCount() const { return storedChunks.size(); }
+  size_t knownEmptyCount() const { return knownEmptyChunks.size(); }
+  void evictEmpty(ChunkPos chunkPos) { knownEmptyChunks.erase(chunkPos); }
+  void evictEmptyBeyond(ChunkPos playerChunk, int radius);
   void removeChunk(ChunkPos chunkPos) { storedChunks.erase(chunkPos); }
   auto &allChunks() { return storedChunks; }
   const auto &allChunks() const { return storedChunks; }

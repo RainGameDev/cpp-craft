@@ -18,8 +18,9 @@ void VulkanApplication::drawFrame() {
   if (fenceResult != vk::Result::eSuccess) {
     throw std::runtime_error("failed to wait for fence!");
   }
-  device.resetFences(*drawFence);
-
+  // NOTE: fence is reset only after a successful acquire. Resetting before
+  // acquire and then returning early (resize path below) would leave the
+  // fence unsignaled forever and deadlock the next waitForFences.
   auto [result, imageIndex] = swapChain.acquireNextImage(
       UINT64_MAX, *presentCompleteSemaphore, nullptr);
 
@@ -31,6 +32,7 @@ void VulkanApplication::drawFrame() {
     updateUniformBuffer(currentFrame % maxConcurrentFrames);
     return;
   }
+  device.resetFences(*drawFence);
 
   updateDirtyChunks();
 
@@ -68,8 +70,6 @@ void VulkanApplication::drawFrame() {
     currentFrame = (currentFrame + 1) % maxConcurrentFrames;
     return;
   }
-
-  currentFrame = (currentFrame + 1) % maxConcurrentFrames;
 
   switch (result) {
   case vk::Result::eSuccess:
