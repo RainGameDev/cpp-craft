@@ -6,5 +6,9 @@
   "topBlock": "game:grass",
   "subBlock": "game:dirt",
   "subDepth": 3,
-  "stoneBlock": "game:stone"
+  "stoneBlock": "game:stone",
+  "tempCenter": 0.6,
+  "tempRadius": 0.35,
+  "humidityCenter": 0.0,
+  "humidityRadius": 10.0
 }

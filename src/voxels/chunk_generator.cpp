@@ -6,6 +6,7 @@
 #include <FastNoise/FastNoise.h>
 #include <array>
 #include <unordered_map>
+#include <vector>
 
 int horizontalDistance(ChunkPos first, ChunkPos second) {
   int deltaX = first.x - second.x;
@@ -69,17 +70,56 @@ void generateChunkTerrain(Chunk &chunk, const VoxelRegistry &registry,
     idCache.emplace(b.name, ids);
     return ids;
   };
+
+  // Snapshot biome
+  std::vector<const Biome *> biomeList;
+  biomeList.reserve(biomes.size());
+  for (const auto &entry : biomes.all())
+    biomeList.push_back(&entry.second);
+  std::vector<float> weightBuf(biomeList.size(), 0.0f);
+
   for (int localZ = 0; localZ < CD; ++localZ) {
     for (int localX = 0; localX < CW; ++localX) {
       int worldX = chunk.pos.x * CW + localX;
       int worldZ = chunk.pos.z * CD + localZ;
-      const Biome &biome = biomes.pick(world.tempAt(worldX, worldZ),
-                                       world.humidityAt(worldX, worldZ));
-      float scaleK = biome.frequency * 100.0f;
-      float surface =
-          biome.baseHeight +
-          world.pointAt(worldX * scaleK, worldZ * scaleK) * biome.amplitude;
-      auto [topId, subId, stoneId] = idsFor(biome);
+      float temp = world.tempAt((float)worldX, (float)worldZ);
+      float humidity = world.humidityAt((float)worldX, (float)worldZ);
+
+      // weights, normalized to sum to 1.
+      float total = 0.0f;
+      for (size_t i = 0; i < biomeList.size(); ++i) {
+        float w = biomes.weightFor(*biomeList[i], temp, humidity);
+        weightBuf[i] = w;
+        total += w;
+      }
+      if (total > 0.0f) {
+        for (float &w : weightBuf)
+          w /= total;
+      }
+
+      // Blended heigh
+      float surface = 0.0f;
+      float blendedSubDepth = 0.0f;
+      const Biome *dominant = biomeList.empty() ? nullptr : biomeList[0];
+      float bestWeight = -1.0f;
+      for (size_t i = 0; i < biomeList.size(); ++i) {
+        const Biome *b = biomeList[i];
+        float w = weightBuf[i];
+        float scaleK = b->frequency * 100.0f;
+        float height =
+            b->baseHeight +
+            world.pointAt(worldX * scaleK, worldZ * scaleK) * b->amplitude;
+        surface += w * height;
+        blendedSubDepth += w * (float)b->subDepth;
+        if (w > bestWeight) {
+          bestWeight = w;
+          dominant = b;
+        }
+      }
+      if (!dominant)
+        continue;
+      auto [topId, subId, stoneId] = idsFor(*dominant);
+      float subBottom = surface - (1.0f + blendedSubDepth);
       for (int localY = 0; localY < CH; ++localY) {
         int worldY = baseY + localY;
         VoxelId id;
@@ -87,7 +127,7 @@ void generateChunkTerrain(Chunk &chunk, const VoxelRegistry &registry,
           id = AIR;
         else if (worldY > surface - 1.0f)
           id = topId;
-        else if (worldY > surface - (1.0f + biome.subDepth))
+        else if (worldY > subBottom)
           id = subId;
         else
           id = stoneId;
