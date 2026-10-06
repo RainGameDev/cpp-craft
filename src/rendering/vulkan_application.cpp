@@ -7,6 +7,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
 #include "voxels/chunk_generator.h"
+#include "voxels/raycast.h"
 #include "voxels/texture_atlas.h"
 #include "voxels/voxel_registry.h"
 #include <GLFW/glfw3.h>
@@ -207,6 +208,18 @@ void VulkanApplication::processInput(GLFWwindow *window, Camera &camera,
 
   // glfwGetMouse
 
+  if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+    RayHit h =
+        raycastVoxel(world, camera.getPosition(), camera.getFront(), 2.0f);
+    if (h.hit)
+      world.setBlock(h.x, h.y, h.z, AIR);
+  }
+  if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
+    RayHit h =
+        raycastVoxel(world, camera.getPosition(), camera.getFront(), 2.0f);
+    if (h.hit)
+      world.setBlock(h.prevX, h.prevY, h.prevZ, 1);
+  }
   if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
     inputDir.z += 1.0;
   if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
