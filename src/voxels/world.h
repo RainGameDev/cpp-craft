@@ -1,6 +1,8 @@
 #pragma once
+#include "FastNoise/Generators/Perlin.h"
 #include "voxels/chunk.h"
 #include "voxels/voxel_def.h"
+#include <FastNoise/FastNoise.h>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -23,6 +25,9 @@ class World {
   // Positions proven to generate all-air. Missing chunks already read as
   // AIR, so these are remembered instead of stored to bound memory.
   std::unordered_set<ChunkPos, ChunkPosHash> knownEmptyChunks;
+
+  int seed;
+  FastNoise::SmartNode<FastNoise::Perlin> perlin;
 
   void markNeighborDirty(ChunkPos chunkPos);
 
