@@ -29,11 +29,31 @@ class World {
   FastNoise::SmartNode<FastNoise::Simplex> simplex =
       FastNoise::New<FastNoise::Simplex>();
   FastNoise::SmartNode<FastNoise::FractalFBm> tempNoise, humidityNoise;
-
+  FastNoise::SmartNode<FastNoise::FractalFBm> caveNoise;
+  FastNoise::SmartNode<FastNoise::FractalFBm> caveNoise2;
+  FastNoise::SmartNode<FastNoise::FractalFBm> blobNoise;
+  FastNoise::SmartNode<FastNoise::FractalFBm> entranceNoise;
   void markNeighborDirty(ChunkPos chunkPos);
 
 public:
+  float caveAt2(float x, float y, float z) const {
+    return caveNoise2->GenSingle3D(x, y, z, seed);
+  }
+
+  float caveAt(float x, float y, float z) const {
+    return caveNoise->GenSingle3D(x, y, z, seed);
+  }
+
+  float blobAt(float x, float y, float z) const {
+    return blobNoise->GenSingle3D(x, y, z, seed);
+  }
+
+  float entranceAt(float x, float z) const {
+    return sample(entranceNoise, x, z);
+  }
+
   explicit World(int seed = 1337);
+  int seedValue() const { return seed; }
 
   float sample(const FastNoise::SmartNode<FastNoise::Generator> &n, float x,
                float y) const {

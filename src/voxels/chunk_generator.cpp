@@ -5,6 +5,9 @@
 #include "voxels/world.h"
 #include <FastNoise/FastNoise.h>
 #include <array>
+#include <cmath>
+#include <cstdint>
+#include <cstdlib>
 #include <unordered_map>
 #include <vector>
 
@@ -123,6 +126,7 @@ void generateChunkTerrain(Chunk &chunk, const VoxelRegistry &registry,
       for (int localY = 0; localY < CH; ++localY) {
         int worldY = baseY + localY;
         VoxelId id;
+
         if (worldY > surface)
           id = AIR;
         else if (worldY > surface - 1.0f)
@@ -131,6 +135,23 @@ void generateChunkTerrain(Chunk &chunk, const VoxelRegistry &registry,
           id = subId;
         else
           id = stoneId;
+
+        if (id != AIR && worldY < surface - 3) {
+          float fx = (float)worldX;
+          float fy = (float)worldY;
+          float fz = (float)worldZ;
+          float n1 = world.caveAt(fx, fy * 1.8f, fz);
+          float n2 = world.caveAt2(fx, fy * 1.8f, fz);
+          constexpr float tunnelW = 0.07f;
+          bool tunnel = std::abs(n1) < tunnelW && std::abs(n2) < tunnelW;
+          if (tunnel) {
+            id = AIR;
+          } else if (worldY < surface - 6) {
+            float n3 = world.blobAt(fx, fy * 1.2f, fz);
+            if (n3 > 0.62f)
+              id = AIR;
+          }
+        }
         chunk.setLocal(localX, localY, localZ, id);
       }
     }

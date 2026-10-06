@@ -559,17 +559,17 @@ private:
 
   vk::raii::Sampler createSampler(uint32_t mipLevels) {
     return vk::raii::Sampler(
-        device,
-        vk::SamplerCreateInfo{.magFilter = vk::Filter::eNearest,
-                              .minFilter = vk::Filter::eNearest,
-                              .mipmapMode = vk::SamplerMipmapMode::eNearest,
-                              .addressModeU = vk::SamplerAddressMode::eRepeat,
-                              .addressModeV = vk::SamplerAddressMode::eRepeat,
-                              .addressModeW = vk::SamplerAddressMode::eRepeat,
-                              .mipLodBias = 0.0f,
-                              .anisotropyEnable = vk::False,
-                              .maxAnisotropy = 1.0f,
-                              .minLod = 0.0f,
-                              .maxLod = static_cast<float>(mipLevels - 1)});
+        device, vk::SamplerCreateInfo{
+                    .magFilter = vk::Filter::eNearest,
+                    .minFilter = vk::Filter::eNearest,
+                    .mipmapMode = vk::SamplerMipmapMode::eNearest,
+                    .addressModeU = vk::SamplerAddressMode::eClampToEdge,
+                    .addressModeV = vk::SamplerAddressMode::eClampToEdge,
+                    .addressModeW = vk::SamplerAddressMode::eClampToEdge,
+                    .mipLodBias = 0.0f,
+                    .anisotropyEnable = vk::False,
+                    .maxAnisotropy = 1.0f,
+                    .minLod = 0.0f,
+                    .maxLod = static_cast<float>(mipLevels - 1)});
   }
 };

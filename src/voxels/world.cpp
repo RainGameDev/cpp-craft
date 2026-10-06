@@ -1,9 +1,34 @@
 #include "voxels/world.h"
-#include "voxels/chunk_generator.h"
 #include "voxels/biome.h"
+#include "voxels/chunk_generator.h"
 #include "voxels/voxel_registry.h"
 
 World::World(int seed_) : seed(seed_) {
+
+  auto cSrc = FastNoise::New<FastNoise::Simplex>();
+  cSrc->SetScale(40.0f);
+  caveNoise = FastNoise::New<FastNoise::FractalFBm>();
+  caveNoise->SetSource(cSrc);
+  caveNoise->SetOctaveCount(2);
+
+  auto cSrc2 = FastNoise::New<FastNoise::Simplex>();
+  cSrc2->SetScale(40.0f);
+  caveNoise2 = FastNoise::New<FastNoise::FractalFBm>();
+  caveNoise2->SetSource(cSrc2);
+  caveNoise2->SetOctaveCount(2);
+
+  auto bSrc = FastNoise::New<FastNoise::Simplex>();
+  bSrc->SetScale(20.0f);
+  blobNoise = FastNoise::New<FastNoise::FractalFBm>();
+  blobNoise->SetSource(bSrc);
+  blobNoise->SetOctaveCount(4);
+
+  auto eSrc = FastNoise::New<FastNoise::Simplex>();
+  eSrc->SetScale(250.0f);
+  entranceNoise = FastNoise::New<FastNoise::FractalFBm>();
+  entranceNoise->SetSource(eSrc);
+  entranceNoise->SetOctaveCount(2);
+
   auto heightSrc = FastNoise::New<FastNoise::Simplex>();
   simplex = FastNoise::New<FastNoise::Simplex>();
   simplex->SetScale(100.0f);
@@ -37,7 +62,7 @@ void World::markNeighborDirty(ChunkPos chunkPos) {
 }
 
 Chunk *World::ensureChunk(ChunkPos chunkPos, const VoxelRegistry &registry,
-                               const BiomeRegistry &biomes) {
+                          const BiomeRegistry &biomes) {
   if (Chunk *existingChunk = getChunk(chunkPos))
     return existingChunk;
   if (knownEmptyChunks.contains(chunkPos))
