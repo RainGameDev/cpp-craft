@@ -76,7 +76,9 @@ void VulkanApplication::initVulkan() {
   if (!textureLoader)
     throw std::runtime_error("voxel atlas: texture loader not registered");
   textureLoader->uploadFromPixels(voxelAtlas.pixels.data(), voxelAtlas.width,
-                                  voxelAtlas.height, "voxel_atlas");
+                                  voxelAtlas.height, voxelAtlas.tileSize,
+                                  voxelAtlas.columns, voxelAtlas.rows,
+                                  "voxel_atlas");
 
   createDescriptorPool();
   createUniformBuffers();
@@ -99,7 +101,7 @@ void VulkanApplication::initVulkan() {
   initImGui();
 }
 
-const uint16_t RENDER_RADIUS = 2;
+const uint16_t RENDER_RADIUS = 8;
 
 void VulkanApplication::mainLoop() {
   float lastTime = 0.0f;

@@ -1,0 +1,12 @@
+{
+  "name": "game:grass",
+  "opaque": true,
+  "solid": true,
+  "tickable": false,
+  "render": "cube",
+  "textures": { "all": "grass_side", "top": "grass_top", "bottom": "dirt" },
+  "components": {
+    "BreakTime": 0.6,
+    "Drops": ["game:item:dirt"]
+  }
+}

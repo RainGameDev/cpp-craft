@@ -9,6 +9,7 @@
 struct AtlasLayout {
   int columns = 1;
   int rows = 1;
+  int tileSize = 16; // square tile edge in px; needed for UV half-texel inset
 };
 
 struct Atlas {
@@ -21,7 +22,7 @@ struct Atlas {
   int tileCount() const;
   std::pair<int, int> tileCell(int index) const; // -> {col,row}
 
-  AtlasLayout layout() const { return {columns, rows}; }
+  AtlasLayout layout() const { return {columns, rows, tileSize}; }
 };
 
 Atlas buildAtlas(const VoxelRegistry &registry, const std::string &textureDir);

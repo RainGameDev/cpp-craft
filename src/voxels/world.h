@@ -1,5 +1,5 @@
 #pragma once
-#include "FastNoise/Generators/Perlin.h"
+#include "FastNoise/Generators/Simplex.h"
 #include "voxels/chunk.h"
 #include "voxels/voxel_def.h"
 #include <FastNoise/FastNoise.h>
@@ -27,7 +27,8 @@ class World {
   std::unordered_set<ChunkPos, ChunkPosHash> knownEmptyChunks;
 
   int seed;
-  FastNoise::SmartNode<FastNoise::Perlin> perlin;
+  FastNoise::SmartNode<FastNoise::Simplex> simplex =
+      FastNoise::New<FastNoise::Simplex>();
 
   void markNeighborDirty(ChunkPos chunkPos);
 

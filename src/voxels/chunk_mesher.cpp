@@ -74,6 +74,11 @@ MeshData meshChunk(const Chunk &chunk, const World &world,
           const uint32_t baseVertex =
               static_cast<uint32_t>(mesh.vertices.size());
           const auto &atlasCell = voxelDef.textureCoords[faceIndex];
+          // Half-texel inset so sampling stays inside the tile at every
+          // mip level instead of bleeding into neighbor tiles.
+          const float inset =
+              atlasLayout.tileSize > 0 ? 0.5f / atlasLayout.tileSize : 0.0f;
+          const float span = 1.0f - 2.0f * inset;
           for (int cornerIndex = 0; cornerIndex < 4; ++cornerIndex) {
             Vertex vertex;
             vertex.pos = glm::vec3(worldX + face.corners[cornerIndex][0],
@@ -81,8 +86,10 @@ MeshData meshChunk(const Chunk &chunk, const World &world,
                                    worldZ + face.corners[cornerIndex][2]);
             vertex.color = glm::vec3(face.shade);
             vertex.uv = glm::vec2(
-                (atlasCell[0] + FACE_UV[cornerIndex][0]) / atlasLayout.columns,
-                (atlasCell[1] + FACE_UV[cornerIndex][1]) / atlasLayout.rows);
+                (atlasCell[0] + inset + FACE_UV[cornerIndex][0] * span) /
+                    atlasLayout.columns,
+                (atlasCell[1] + inset + FACE_UV[cornerIndex][1] * span) /
+                    atlasLayout.rows);
             mesh.vertices.push_back(vertex);
           }
           mesh.indices.insert(mesh.indices.end(),

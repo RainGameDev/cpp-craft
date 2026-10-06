@@ -24,7 +24,7 @@ Chunk *World::ensureChunk(ChunkPos chunkPos, const VoxelRegistry &registry) {
     return nullptr;
 
   Chunk &chunk = getOrCreateChunk(chunkPos);
-  generateChunkTerrain(chunk, registry);
+  generateChunkTerrain(chunk, registry, simplex);
   chunk.generated = true;
 
   bool anySolid = false;

@@ -2,6 +2,7 @@
 #include "assets/shader_loader.h"
 #include "rendering/vertex.h"
 #include "rendering/vulkan_application.h"
+#include "vulkan/vulkan.hpp"
 
 #include <cstdint>
 #include <fstream>
@@ -59,7 +60,7 @@ void VulkanApplication::createGraphicsPipeline() {
 
   vk::PipelineMultisampleStateCreateInfo multisampling{
       .rasterizationSamples = vk::SampleCountFlagBits::e1,
-      .sampleShadingEnable = vk::False};
+      .sampleShadingEnable = vk::True};
 
   vk::PipelineDepthStencilStateCreateInfo depthStencil{
       .depthTestEnable = vk::True,
@@ -109,14 +110,14 @@ void VulkanApplication::createGraphicsPipeline() {
            .pViewportState = &viewportState,
            .pRasterizationState = &rasterizer,
            .pMultisampleState = &multisampling,
-            .pDepthStencilState = &depthStencil,
+           .pDepthStencilState = &depthStencil,
            .pColorBlendState = &colorBlending,
            .pDynamicState = &dynamicState,
            .layout = pipelineLayout,
            .renderPass = nullptr},
           {.colorAttachmentCount = 1,
            .pColorAttachmentFormats = &swapChainSurfaceFormat.format,
-            .depthAttachmentFormat = depthFormat}};
+           .depthAttachmentFormat = depthFormat}};
 
   graphicsPipeline = vk::raii::Pipeline(
       device, nullptr,

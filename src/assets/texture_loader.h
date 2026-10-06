@@ -38,73 +38,122 @@ public:
     return {".png", ".jpg", ".jpeg", ".dds", ".bmp"};
   }
 
-  /// Evil ass math function that fixes my mipmaps
+  static float srgbByteToLinear(uint8_t c) {
+    float v = c / 255.0f;
+    return v <= 0.04045f ? v / 12.92f : std::pow((v + 0.055f) / 1.055f, 2.4f);
+  }
+
+  static uint8_t linearToSrgbByte(float v) {
+    v = std::clamp(v, 0.0f, 1.0f);
+    float c = v <= 0.0031308f ? v * 12.92f
+                              : 1.055f * std::pow(v, 1.0f / 2.4f) - 0.055f;
+    return static_cast<uint8_t>(std::round(c * 255.0f));
+  }
+
+  // box downsample in linear space
+  static std::vector<uint8_t> downsampleSRGB(const uint8_t *prev, int curW,
+                                             int curH) {
+    int nextW = std::max(1, curW / 2);
+    int nextH = std::max(1, curH / 2);
+    std::vector<uint8_t> next((size_t)nextW * nextH * 4);
+    for (int y = 0; y < nextH; y++) {
+      for (int x = 0; x < nextW; x++) {
+        int x0 = x * 2, x1 = std::min(x * 2 + 1, curW - 1);
+        int y0 = y * 2, y1 = std::min(y * 2 + 1, curH - 1);
+        for (int c = 0; c < 4; c++) {
+          auto sample = [&](int sx, int sy) {
+            uint8_t v = prev[((size_t)sy * curW + sx) * 4 + c];
+            return c == 3 ? v / 255.0f : srgbByteToLinear(v);
+          };
+          float avg = (sample(x0, y0) + sample(x1, y0) + sample(x0, y1) +
+                       sample(x1, y1)) /
+                      4.0f;
+          next[((size_t)y * nextW + x) * 4 + c] =
+              c == 3 ? static_cast<uint8_t>(std::round(avg * 255.0f))
+                     : linearToSrgbByte(avg);
+        }
+      }
+    }
+    return next;
+  }
+
+  /// Mip chain for a standalone texture the whole image is one tile, so
+  /// a plain image box filter is correct.
   static std::vector<std::vector<uint8_t>>
   generateMipChainSRGB(const uint8_t *basePixels, int w, int h,
                        uint32_t mipLevels) {
-    // Convert the bytes to be linear
-    auto srgbToLinear = [](uint8_t c) {
-      float v = c / 255.0f;
-      return v <= 0.04045f ? v / 12.92f : std::pow((v + 0.055f) / 1.055f, 2.4f);
-    };
-
-    // Convert the linear back to SRGB
-    auto linearToSrgb = [](float v) {
-      v = std::clamp(v, 0.0f, 1.0f);
-      float c = v <= 0.0031308f ? v * 12.92f
-                                : 1.055f * std::pow(v, 1.0f / 2.4f) - 0.055f;
-      return static_cast<uint8_t>(std::round(c * 255.0f));
-    };
-
     std::vector<std::vector<uint8_t>> mips;
-    mips.emplace_back(basePixels,
-                      // Mip 0 is the original image
-                      basePixels + (size_t)w * h * 4);
-
+    mips.emplace_back(basePixels, basePixels + (size_t)w * h * 4);
     int curW = w, curH = h;
     for (uint32_t level = 1; level < mipLevels; level++) {
-      // each mip is half the size of the previous one
-      int nextW = std::max(1, curW / 2);
-      int nextH = std::max(1, curH / 2);
+      mips.push_back(downsampleSRGB(mips.back().data(), curW, curH));
+      curW = std::max(1, curW / 2);
+      curH = std::max(1, curH / 2);
+    }
+    return mips;
+  }
 
-      // source data = previous mip level
-      const uint8_t *prev = mips.back().data();
-      std::vector<uint8_t> next((size_t)nextW * nextH * 4);
+  struct AtlasMipChain {
+    std::vector<std::vector<uint8_t>> mips;   // packed atlas bytes per level
+    std::vector<std::pair<int, int>> extents; // (w, h) per level
+  };
 
-      for (int y = 0; y < nextH; y++) {
-        for (int x = 0; x < nextW; x++) {
-          // 2x2 block of source pixels to scale
-          // clamped so its not read past the edge
-          int x0 = x * 2, x1 = std::min(x * 2 + 1, curW - 1);
-          int y0 = y * 2, y1 = std::min(y * 2 + 1, curH - 1);
+  /// Mip chain for a packed tile atlas.
+  static AtlasMipChain generateAtlasMipChain(const uint8_t *basePixels,
+                                             int atlasW, int atlasH,
+                                             int tileSize, int columns,
+                                             int rows) {
+    uint32_t mipLevels =
+        static_cast<uint32_t>(std::floor(std::log2(tileSize))) + 1;
 
-          // loop over R, G, B, A channels
-          for (int c = 0; c < 4; c++) {
-            // fetch one channel of one source pixel, converting sRGB tolinear
-            auto sample = [&](int sx, int sy) {
-              uint8_t v = prev[((size_t)sy * curW + sx) * 4 + c];
-              return c == 3 ? v / 255.0f : srgbToLinear(v);
-            };
+    // Split the base atlas into tile buffers (empty cells stay zero).
+    std::vector<std::vector<uint8_t>> tiles((size_t)columns * rows);
+    for (int row = 0; row < rows; row++) {
+      for (int col = 0; col < columns; col++) {
+        auto &tile = tiles[(size_t)row * columns + col];
+        tile.resize((size_t)tileSize * tileSize * 4);
+        for (int y = 0; y < tileSize; y++) {
+          const uint8_t *src =
+              basePixels +
+              ((size_t)(row * tileSize + y) * atlasW + col * tileSize) * 4;
+          uint8_t *dst = tile.data() + (size_t)y * tileSize * 4;
+          size_t copyBytes = (size_t)tileSize * 4;
+          if ((row * tileSize + y) < atlasH)
+            memcpy(dst, src, copyBytes);
+          else
+            memset(dst, 0, copyBytes);
+        }
+      }
+    }
 
-            // average the 2x2 block in linear space
-            float avg = (sample(x0, y0) + sample(x1, y0) + sample(x0, y1) +
-                         sample(x1, y1)) /
-                        4.0f;
-
-            // write result back, converting linear to sRGB for color channels,
-            next[((size_t)y * nextW + x) * 4 + c] =
-                c == 3 ? static_cast<uint8_t>(std::round(avg * 255.0f))
-                       : linearToSrgb(avg);
+    AtlasMipChain chain;
+    int curTile = tileSize;
+    for (uint32_t level = 0; level < mipLevels; level++) {
+      int tileDim = std::max(1, tileSize >> level);
+      int levelW = columns * tileDim, levelH = rows * tileDim;
+      std::vector<uint8_t> packed((size_t)levelW * levelH * 4, 0);
+      for (int row = 0; row < rows; row++) {
+        for (int col = 0; col < columns; col++) {
+          size_t tileIndex = (size_t)row * columns + col;
+          if (level > 0) {
+            tiles[tileIndex] =
+                downsampleSRGB(tiles[tileIndex].data(), curTile, curTile);
+          }
+          const auto &tile = tiles[tileIndex];
+          for (int y = 0; y < tileDim; y++) {
+            uint8_t *dst =
+                packed.data() +
+                ((size_t)(row * tileDim + y) * levelW + col * tileDim) * 4;
+            const uint8_t *src = tile.data() + (size_t)y * tileDim * 4;
+            memcpy(dst, src, (size_t)tileDim * 4);
           }
         }
       }
-
-      // store this level, move on to the next
-      mips.push_back(std::move(next));
-      curW = nextW;
-      curH = nextH;
+      chain.mips.push_back(std::move(packed));
+      chain.extents.emplace_back(levelW, levelH);
+      curTile = tileDim;
     }
-    return mips;
+    return chain;
   }
 
   TextureAsset loadAsset(const std::string &path) override {
@@ -116,11 +165,12 @@ public:
     if (!pixels)
       throw std::runtime_error("Failed to load texture: " + path);
 
+    // Standalone texture
     uint32_t mipLevels =
         static_cast<uint32_t>(std::floor(std::log2(std::max(w, h)))) + 1;
 
     auto mipChain = generateMipChainSRGB(pixels, w, h, mipLevels);
-    free(pixels);
+    stbi_image_free(pixels);
 
     vk::DeviceSize totalSize = 0;
     std::vector<vk::DeviceSize> offsets(mipLevels);
@@ -204,20 +254,17 @@ public:
   }
 
   TextureAsset &uploadFromPixels(const uint8_t *atlasPixels, int atlasWidth,
-                                 int atlasHeight,
-                                 const std::string &assetName) {
-    uint32_t mipLevels = static_cast<uint32_t>(std::floor(
-                             std::log2(std::max(atlasWidth, atlasHeight)))) +
-                         1;
-
-    auto mipChain =
-        generateMipChainSRGB(atlasPixels, atlasWidth, atlasHeight, mipLevels);
+                                 int atlasHeight, int tileSize, int columns,
+                                 int rows, const std::string &assetName) {
+    AtlasMipChain chain = generateAtlasMipChain(
+        atlasPixels, atlasWidth, atlasHeight, tileSize, columns, rows);
+    uint32_t mipLevels = static_cast<uint32_t>(chain.mips.size());
 
     vk::DeviceSize totalSize = 0;
     std::vector<vk::DeviceSize> mipOffsets(mipLevels);
     for (uint32_t mipIndex = 0; mipIndex < mipLevels; mipIndex++) {
       mipOffsets[mipIndex] = totalSize;
-      totalSize += mipChain[mipIndex].size();
+      totalSize += chain.mips[mipIndex].size();
     }
 
     vk::raii::Buffer stagingBuffer{nullptr};
@@ -230,7 +277,7 @@ public:
     void *mappedPixels = stagingMemory.mapMemory(0, totalSize);
     for (uint32_t mipIndex = 0; mipIndex < mipLevels; mipIndex++)
       memcpy(static_cast<uint8_t *>(mappedPixels) + mipOffsets[mipIndex],
-             mipChain[mipIndex].data(), mipChain[mipIndex].size());
+             chain.mips[mipIndex].data(), chain.mips[mipIndex].size());
     stagingMemory.unmapMemory();
 
     vk::raii::Image image{nullptr};
@@ -254,6 +301,8 @@ public:
 
     int mipWidth = atlasWidth, mipHeight = atlasHeight;
     for (uint32_t mipIndex = 0; mipIndex < mipLevels; mipIndex++) {
+      mipWidth = chain.extents[mipIndex].first;
+      mipHeight = chain.extents[mipIndex].second;
       vk::BufferImageCopy copyRegion{
           .bufferOffset = mipOffsets[mipIndex],
           .imageSubresource = {.aspectMask = vk::ImageAspectFlagBits::eColor,
@@ -264,8 +313,6 @@ public:
       copyCommand.copyBufferToImage(*stagingBuffer, *image,
                                     vk::ImageLayout::eTransferDstOptimal,
                                     copyRegion);
-      mipWidth = std::max(1, mipWidth / 2);
-      mipHeight = std::max(1, mipHeight / 2);
     }
     copyCommand.end();
 
@@ -470,7 +517,7 @@ private:
 
       cmd.blitImage(*image, vk::ImageLayout::eTransferSrcOptimal, *image,
                     vk::ImageLayout::eTransferDstOptimal, blit,
-                    vk::Filter::eLinear);
+                    vk::Filter::eNearest);
 
       transitionImageLayoutSingle(cmd, image, i - 1,
                                   vk::ImageLayout::eTransferSrcOptimal,
@@ -511,7 +558,6 @@ private:
   }
 
   vk::raii::Sampler createSampler(uint32_t mipLevels) {
-    auto limits = physicalDevice.getProperties().limits;
     return vk::raii::Sampler(
         device,
         vk::SamplerCreateInfo{.magFilter = vk::Filter::eNearest,
@@ -519,8 +565,11 @@ private:
                               .mipmapMode = vk::SamplerMipmapMode::eNearest,
                               .addressModeU = vk::SamplerAddressMode::eRepeat,
                               .addressModeV = vk::SamplerAddressMode::eRepeat,
-                              .anisotropyEnable = vk::True,
-                              .maxAnisotropy = limits.maxSamplerAnisotropy,
+                              .addressModeW = vk::SamplerAddressMode::eRepeat,
+                              .mipLodBias = 0.0f,
+                              .anisotropyEnable = vk::False,
+                              .maxAnisotropy = 1.0f,
+                              .minLod = 0.0f,
                               .maxLod = static_cast<float>(mipLevels - 1)});
   }
 };
