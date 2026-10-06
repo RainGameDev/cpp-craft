@@ -53,6 +53,7 @@ void VulkanApplication::initVulkan() {
   createDescriptorSetLayout();
   assetManager.addLoader(std::make_unique<TextureLoader>(
       device, physicalDevice, commandPool, queue, queueIndex));
+
   voxelRegistry.loadFromDir("assets/blocks");
   std::print("loaded {} voxel defs\n", voxelRegistry.size());
   for (VoxelId i = 0; i < voxelRegistry.size(); ++i) {
@@ -65,6 +66,9 @@ void VulkanApplication::initVulkan() {
                d.name, d.opaque, (int)d.render, bt, texts);
   }
 
+  biomeRegistry.loadFromDir("assets/biomes");
+  std::print("loaded {} biomes\n", biomeRegistry.size());
+
   camera = Camera(glm::vec3(24.0f, 20.0f, -8.0f), glm::vec3(0.0f, 1.0f, 0.0f),
                   108.0f, -35.0f);
   assetManager.loadDirectory("assets/");
@@ -75,10 +79,9 @@ void VulkanApplication::initVulkan() {
       dynamic_cast<TextureLoader *>(assetManager.getLoader<TextureAsset>());
   if (!textureLoader)
     throw std::runtime_error("voxel atlas: texture loader not registered");
-  textureLoader->uploadFromPixels(voxelAtlas.pixels.data(), voxelAtlas.width,
-                                  voxelAtlas.height, voxelAtlas.tileSize,
-                                  voxelAtlas.columns, voxelAtlas.rows,
-                                  "voxel_atlas");
+  textureLoader->uploadFromPixels(
+      voxelAtlas.pixels.data(), voxelAtlas.width, voxelAtlas.height,
+      voxelAtlas.tileSize, voxelAtlas.columns, voxelAtlas.rows, "voxel_atlas");
 
   createDescriptorPool();
   createUniformBuffers();
@@ -121,11 +124,14 @@ void VulkanApplication::mainLoop() {
       lastStreamedChunk = playerChunk;
       for (int radiusStep = 0; radiusStep <= RENDER_RADIUS; ++radiusStep)
         for (ChunkPos column : spiralAround(playerChunk, radiusStep)) {
-          for (int columnY = 0; columnY <= playerChunk.y; ++columnY) {
+          int bottomY = playerChunk.y - 2;
+          if (bottomY > 0)
+            bottomY = 0;
+          for (int columnY = bottomY; columnY <= playerChunk.y; ++columnY) {
             ChunkPos target{column.x, columnY, column.z};
             if (!world.hasChunk(target) && !world.isKnownEmpty(target))
-              world.ensureChunk(target,
-                                voxelRegistry); // generates, dirties neighbors
+              world.ensureChunk(target, voxelRegistry,
+                                biomeRegistry); // generates, dirties neighbors
           }
         }
 

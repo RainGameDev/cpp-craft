@@ -1,0 +1,10 @@
+{
+  "name": "game:plains",
+  "baseHeight": 10.0,
+  "amplitude": 2.0,
+  "frequency": 0.05,
+  "topBlock": "game:grass",
+  "subBlock": "game:dirt",
+  "subDepth": 3,
+  "stoneBlock": "game:stone"
+}

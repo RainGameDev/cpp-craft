@@ -19,20 +19,32 @@ inline int floorMod(int value, int divisor) {
 }
 
 class VoxelRegistry;
+class BiomeRegistry;
 
 class World {
   std::unordered_map<ChunkPos, Chunk, ChunkPosHash> storedChunks;
-  // Positions proven to generate all-air. Missing chunks already read as
-  // AIR, so these are remembered instead of stored to bound memory.
   std::unordered_set<ChunkPos, ChunkPosHash> knownEmptyChunks;
 
   int seed;
   FastNoise::SmartNode<FastNoise::Simplex> simplex =
       FastNoise::New<FastNoise::Simplex>();
+  FastNoise::SmartNode<FastNoise::FractalFBm> tempNoise, humidityNoise;
 
   void markNeighborDirty(ChunkPos chunkPos);
 
 public:
+  explicit World(int seed = 1337);
+
+  float sample(const FastNoise::SmartNode<FastNoise::Generator> &n, float x,
+               float y) const {
+    return n->GenSingle2D(x, y, seed);
+  }
+  float tempAt(float x, float y) const { return sample(tempNoise, x, y); }
+  float humidityAt(float x, float y) const {
+    return sample(humidityNoise, x, y);
+  }
+  float pointAt(float x, float y) const { return sample(simplex, x, y); }
+
   static ChunkPos toChunkPos(int worldX, int worldY, int worldZ) {
     return {.x = floorDiv(worldX, CW),
             .y = floorDiv(worldY, CH),
@@ -55,7 +67,8 @@ public:
     chunkIterator->second.pos = chunkPos;
     return chunkIterator->second;
   }
-  Chunk *ensureChunk(ChunkPos chunkPos, const VoxelRegistry &registry);
+  Chunk *ensureChunk(ChunkPos chunkPos, const VoxelRegistry &registry,
+                     const BiomeRegistry &biomes);
   bool isKnownEmpty(ChunkPos chunkPos) const {
     return knownEmptyChunks.contains(chunkPos);
   }

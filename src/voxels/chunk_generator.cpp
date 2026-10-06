@@ -1,8 +1,11 @@
 #include "voxels/chunk_generator.h"
-#include "FastNoise/Generators/Simplex.h"
+#include "voxels/biome.h"
 #include "voxels/chunk.h"
 #include "voxels/voxel_registry.h"
+#include "voxels/world.h"
 #include <FastNoise/FastNoise.h>
+#include <array>
+#include <unordered_map>
 
 int horizontalDistance(ChunkPos first, ChunkPos second) {
   int deltaX = first.x - second.x;
@@ -54,27 +57,41 @@ std::vector<ChunkPos> spiralAround(ChunkPos center, int radius) {
 }
 
 void generateChunkTerrain(Chunk &chunk, const VoxelRegistry &registry,
-                          FastNoise::SmartNode<FastNoise::Simplex> &simplex) {
-
-  simplex.get()->SetScale(5);
-  VoxelId dirtId = registry.idFromString("game:dirt");
-  VoxelId grassId = registry.idFromString("game:grass");
-  VoxelId stoneId = registry.idFromString("game:stone");
+                          const BiomeRegistry &biomes, const World &world) {
   const int baseY = chunk.pos.y * CH;
-  for (int localY = 0; localY < CH; ++localY) {
-    for (int localZ = 0; localZ < CD; ++localZ) {
-      for (int localX = 0; localX < CW; ++localX) {
-        int worldX = chunk.pos.x * CD + localX;
-        int worldZ = chunk.pos.z * CW + localZ;
+  std::unordered_map<std::string, std::array<VoxelId, 3>> idCache;
+  auto idsFor = [&](const Biome &b) {
+    if (auto f = idCache.find(b.name); f != idCache.end())
+      return f->second;
+    std::array<VoxelId, 3> ids = {registry.idFromString(b.topBlock),
+                                  registry.idFromString(b.subBlock),
+                                  registry.idFromString(b.stoneBlock)};
+    idCache.emplace(b.name, ids);
+    return ids;
+  };
+  for (int localZ = 0; localZ < CD; ++localZ) {
+    for (int localX = 0; localX < CW; ++localX) {
+      int worldX = chunk.pos.x * CW + localX;
+      int worldZ = chunk.pos.z * CD + localZ;
+      const Biome &biome = biomes.pick(world.tempAt(worldX, worldZ),
+                                       world.humidityAt(worldX, worldZ));
+      float scaleK = biome.frequency * 100.0f;
+      float surface =
+          biome.baseHeight +
+          world.pointAt(worldX * scaleK, worldZ * scaleK) * biome.amplitude;
+      auto [topId, subId, stoneId] = idsFor(biome);
+      for (int localY = 0; localY < CH; ++localY) {
         int worldY = baseY + localY;
-
-        float heightVariation =
-            simplex.get()->GenSingle2D(worldX * 0.05, worldZ * 0.05, 1) * 7.0;
-
-        if (worldY > (10.0 + heightVariation))
-          chunk.setLocal(localX, localY, localZ, 0);
+        VoxelId id;
+        if (worldY > surface)
+          id = AIR;
+        else if (worldY > surface - 1.0f)
+          id = topId;
+        else if (worldY > surface - (1.0f + biome.subDepth))
+          id = subId;
         else
-          chunk.setLocal(localX, localY, localZ, grassId);
+          id = stoneId;
+        chunk.setLocal(localX, localY, localZ, id);
       }
     }
   }

@@ -4,7 +4,7 @@
   "solid": true,
   "tickable": false,
   "render": "cube",
-  "textures": { "all": "stone", "left": "furnace" },
+  "textures": { "all": "stone" },
   "components": {
     "BreakTime": 5.0,
     "Drops": ["game:item:cobblestone"],

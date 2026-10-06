@@ -9,6 +9,7 @@
 #include <GLFW/glfw3.h>
 
 #include "../assets/asset_manager.h"
+#include "../voxels/biome.h"
 #include "../voxels/voxel_registry.h"
 #include "../voxels/texture_atlas.h"
 #include "../voxels/world.h"
@@ -159,6 +160,7 @@ private:
 
   AssetManager assetManager;
   VoxelRegistry voxelRegistry;
+  BiomeRegistry biomeRegistry;
 
   static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(
       vk::DebugUtilsMessageSeverityFlagBitsEXT severity,

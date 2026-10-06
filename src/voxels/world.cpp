@@ -1,6 +1,25 @@
 #include "voxels/world.h"
 #include "voxels/chunk_generator.h"
+#include "voxels/biome.h"
 #include "voxels/voxel_registry.h"
+
+World::World(int seed_) : seed(seed_) {
+  auto heightSrc = FastNoise::New<FastNoise::Simplex>();
+  simplex = FastNoise::New<FastNoise::Simplex>();
+  simplex->SetScale(100.0f);
+
+  auto tSrc = FastNoise::New<FastNoise::Simplex>();
+  tSrc->SetScale(800.0f);
+  tempNoise = FastNoise::New<FastNoise::FractalFBm>();
+  tempNoise->SetSource(tSrc);
+  tempNoise->SetOctaveCount(3);
+
+  auto hSrc = FastNoise::New<FastNoise::Simplex>();
+  hSrc->SetScale(800.0f);
+  humidityNoise = FastNoise::New<FastNoise::FractalFBm>();
+  humidityNoise->SetSource(hSrc);
+  humidityNoise->SetOctaveCount(3);
+}
 
 VoxelId World::getBlock(int worldX, int worldY, int worldZ) const {
   ChunkPos chunkPos = toChunkPos(worldX, worldY, worldZ);
@@ -17,14 +36,15 @@ void World::markNeighborDirty(ChunkPos chunkPos) {
     neighbor->dirty = true;
 }
 
-Chunk *World::ensureChunk(ChunkPos chunkPos, const VoxelRegistry &registry) {
+Chunk *World::ensureChunk(ChunkPos chunkPos, const VoxelRegistry &registry,
+                               const BiomeRegistry &biomes) {
   if (Chunk *existingChunk = getChunk(chunkPos))
     return existingChunk;
   if (knownEmptyChunks.contains(chunkPos))
     return nullptr;
 
   Chunk &chunk = getOrCreateChunk(chunkPos);
-  generateChunkTerrain(chunk, registry, simplex);
+  generateChunkTerrain(chunk, registry, biomes, *this);
   chunk.generated = true;
 
   bool anySolid = false;
