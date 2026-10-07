@@ -55,7 +55,8 @@ void VulkanApplication::recordCommandBuffer(uint32_t imageIndex,
   commandBuffer.beginRendering(renderingInfo);
 
   commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
-                             *graphicsPipeline);
+                             isWirframe ? wireframePipeline
+                                        : *graphicsPipeline);
 
   commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
                                    *pipelineLayout, 0,

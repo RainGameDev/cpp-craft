@@ -8,10 +8,13 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#pragma once
+
+#include "../utils/input_manager.h"
 #include "../assets/asset_manager.h"
 #include "../voxels/biome.h"
-#include "../voxels/voxel_registry.h"
 #include "../voxels/texture_atlas.h"
+#include "../voxels/voxel_registry.h"
 #include "../voxels/world.h"
 #include "camera.h"
 #include "mesh.h"
@@ -67,8 +70,11 @@ private:
   vk::raii::DeviceMemory depthMemory = nullptr;
   vk::raii::ImageView depthView = nullptr;
 
+  bool isWirframe = false;
+
   vk::raii::PipelineLayout pipelineLayout = nullptr;
   vk::raii::Pipeline graphicsPipeline = nullptr;
+  vk::raii::Pipeline wireframePipeline = nullptr;
   vk::raii::CommandPool commandPool = nullptr;
   vk::raii::CommandBuffer commandBuffer = nullptr;
   vk::raii::Semaphore presentCompleteSemaphore = nullptr;
@@ -85,8 +91,8 @@ private:
 
   vk::raii::DescriptorPool imguiPool = nullptr;
 
-  static double lastX, lastY;
-  static bool firstMouse;
+  InputManager input;
+
   Camera camera;
 
   uint32_t currentFrame = 0;
@@ -155,8 +161,8 @@ private:
   void initImGui();
   void cleanupImGui();
 
-  void processInput(GLFWwindow *window, Camera &camera, float deltaTime);
-  static void mouse_callback(GLFWwindow *window, double xpos, double ypos);
+  void processInput(float deltaTime);
+  void setupKeybinds();
 
   AssetManager assetManager;
   VoxelRegistry voxelRegistry;

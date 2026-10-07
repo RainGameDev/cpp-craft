@@ -2,8 +2,15 @@
 #include "voxels/biome.h"
 #include "voxels/chunk_generator.h"
 #include "voxels/voxel_registry.h"
+#include <cstdlib>
+#include <random>
 
-World::World(int seed_) : seed(seed_) {
+World::World() {
+
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  int newSeed = gen();
+  seed = newSeed;
 
   auto cSrc = FastNoise::New<FastNoise::Simplex>();
   cSrc->SetScale(40.0f);
@@ -12,19 +19,19 @@ World::World(int seed_) : seed(seed_) {
   caveNoise->SetOctaveCount(2);
 
   auto cSrc2 = FastNoise::New<FastNoise::Simplex>();
-  cSrc2->SetScale(40.0f);
+  cSrc2->SetScale(20.0f);
   caveNoise2 = FastNoise::New<FastNoise::FractalFBm>();
   caveNoise2->SetSource(cSrc2);
-  caveNoise2->SetOctaveCount(2);
+  caveNoise2->SetOctaveCount(4);
 
   auto bSrc = FastNoise::New<FastNoise::Simplex>();
-  bSrc->SetScale(20.0f);
+  bSrc->SetScale(10.0f);
   blobNoise = FastNoise::New<FastNoise::FractalFBm>();
   blobNoise->SetSource(bSrc);
   blobNoise->SetOctaveCount(4);
 
   auto eSrc = FastNoise::New<FastNoise::Simplex>();
-  eSrc->SetScale(250.0f);
+  eSrc->SetScale(20.0f);
   entranceNoise = FastNoise::New<FastNoise::FractalFBm>();
   entranceNoise->SetSource(eSrc);
   entranceNoise->SetOctaveCount(2);

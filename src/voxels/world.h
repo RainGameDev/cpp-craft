@@ -52,7 +52,7 @@ public:
     return sample(entranceNoise, x, z);
   }
 
-  explicit World(int seed = 1337);
+  explicit World();
   int seedValue() const { return seed; }
 
   float sample(const FastNoise::SmartNode<FastNoise::Generator> &n, float x,

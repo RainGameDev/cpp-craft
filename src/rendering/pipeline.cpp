@@ -122,4 +122,36 @@ void VulkanApplication::createGraphicsPipeline() {
   graphicsPipeline = vk::raii::Pipeline(
       device, nullptr,
       pipelineCreateInfoChain.get<vk::GraphicsPipelineCreateInfo>());
+
+  vk::PipelineRasterizationStateCreateInfo wfRasterizer{
+      .depthClampEnable = vk::False,
+      .rasterizerDiscardEnable = vk::False,
+      .polygonMode = vk::PolygonMode::eLine,
+      .cullMode = vk::CullModeFlagBits::eBack,
+      .frontFace = vk::FrontFace::eCounterClockwise,
+      .depthBiasEnable = vk::False,
+      .lineWidth = 1.0f};
+
+  vk::StructureChain<vk::GraphicsPipelineCreateInfo,
+                     vk::PipelineRenderingCreateInfo>
+      wireframePipelineCreateInfoChain = {
+          {.stageCount = 2,
+           .pStages = shaderStages,
+           .pVertexInputState = &vertexInputInfo,
+           .pInputAssemblyState = &inputAssembly,
+           .pViewportState = &viewportState,
+           .pRasterizationState = &wfRasterizer,
+           .pMultisampleState = &multisampling,
+           .pDepthStencilState = &depthStencil,
+           .pColorBlendState = &colorBlending,
+           .pDynamicState = &dynamicState,
+           .layout = pipelineLayout,
+           .renderPass = nullptr},
+          {.colorAttachmentCount = 1,
+           .pColorAttachmentFormats = &swapChainSurfaceFormat.format,
+           .depthAttachmentFormat = depthFormat}};
+
+  wireframePipeline = vk::raii::Pipeline(
+      device, nullptr,
+      wireframePipelineCreateInfoChain.get<vk::GraphicsPipelineCreateInfo>());
 }

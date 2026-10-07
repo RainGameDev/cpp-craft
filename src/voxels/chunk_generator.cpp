@@ -62,6 +62,7 @@ std::vector<ChunkPos> spiralAround(ChunkPos center, int radius) {
 
 void generateChunkTerrain(Chunk &chunk, const VoxelRegistry &registry,
                           const BiomeRegistry &biomes, const World &world) {
+
   const int baseY = chunk.pos.y * CH;
   std::unordered_map<std::string, std::array<VoxelId, 3>> idCache;
   auto idsFor = [&](const Biome &b) {
@@ -142,13 +143,13 @@ void generateChunkTerrain(Chunk &chunk, const VoxelRegistry &registry,
           float fz = (float)worldZ;
           float n1 = world.caveAt(fx, fy * 1.8f, fz);
           float n2 = world.caveAt2(fx, fy * 1.8f, fz);
-          constexpr float tunnelW = 0.07f;
+          constexpr float tunnelW = 0.08f;
           bool tunnel = std::abs(n1) < tunnelW && std::abs(n2) < tunnelW;
           if (tunnel) {
             id = AIR;
           } else if (worldY < surface - 6) {
             float n3 = world.blobAt(fx, fy * 1.2f, fz);
-            if (n3 > 0.62f)
+            if (n3 > 0.80f)
               id = AIR;
           }
         }
