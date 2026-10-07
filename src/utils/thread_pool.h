@@ -1,6 +1,5 @@
+#pragma once
 
-
-#include "voxels/chunk.h"
 #include <atomic>
 #include <condition_variable>
 #include <functional>
@@ -10,35 +9,32 @@
 #include <vector>
 
 struct ThreadPool {
-
 public:
   std::vector<std::thread> threads;
-  std::queue<ChunkPos> chunkPosQueue;
-  std::queue<Chunk> chunkQueue;
-  std::mutex chunkMutex;
-  std::atomic<bool> stop;
+  std::mutex mutex;
+  std::atomic<bool> stop{false};
   std::queue<std::function<void()>> tasks;
   std::condition_variable condition;
 
-  ThreadPool(size_t num_threads = std::thread::hardware_concurrency()) {
-    // Creating worker threads
+  ThreadPool(const ThreadPool &) = delete;
+  ThreadPool &operator=(const ThreadPool &) = delete;
+
+  explicit ThreadPool(size_t num_threads = std::thread::hardware_concurrency()) {
+    if (num_threads == 0)
+      num_threads = 1;
     for (size_t i = 0; i < num_threads; ++i) {
       threads.emplace_back([this] {
         while (true) {
           std::function<void()> task;
           {
-            std::unique_lock<std::mutex> lock(chunkMutex);
-
-            condition.wait(lock, [this] { stop; });
-
-            if (stop) {
+            std::unique_lock<std::mutex> lock(mutex);
+            condition.wait(lock,
+                           [this] { return stop.load() || !tasks.empty(); });
+            if (stop.load() && tasks.empty())
               return;
-            }
-
-            task = tasks.front();
+            task = std::move(tasks.front());
             tasks.pop();
           }
-
           task();
         }
       });
@@ -47,21 +43,22 @@ public:
 
   ~ThreadPool() {
     {
-      std::unique_lock<std::mutex> lock(chunkMutex);
-      stop = true;
+      std::unique_lock<std::mutex> lock(mutex);
+      stop.store(true);
     }
-
     condition.notify_all();
-
     for (auto &thread : threads) {
-      thread.join();
+      if (thread.joinable())
+        thread.join();
     }
   }
 
   void enqueue(std::function<void()> task) {
     {
-      std::unique_lock<std::mutex> lock(chunkMutex);
-      tasks.emplace(task);
+      std::unique_lock<std::mutex> lock(mutex);
+      if (stop.load())
+        return;
+      tasks.emplace(std::move(task));
     }
     condition.notify_one();
   }

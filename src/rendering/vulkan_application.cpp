@@ -11,9 +11,11 @@
 #include "voxels/texture_atlas.h"
 #include "voxels/voxel_registry.h"
 #include <GLFW/glfw3.h>
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <print>
+#include <vector>
 
 void VulkanApplication::run() {
   initVulkan();
@@ -123,7 +125,7 @@ void VulkanApplication::initVulkan() {
   initImGui();
 }
 
-const uint16_t RENDER_RADIUS = 4;
+const uint16_t RENDER_RADIUS = 16;
 
 void VulkanApplication::mainLoop() {
   float lastTime = 0.0f;
@@ -136,28 +138,20 @@ void VulkanApplication::mainLoop() {
     ChunkPos playerChunk = World::toChunkPos((int)std::floor(playerPos.x),
                                              (int)std::floor(playerPos.y),
                                              (int)std::floor(playerPos.z));
+    currentPlayerChunk = playerChunk;
 
     if (!streamInitialized || !(playerChunk == lastStreamedChunk)) {
       streamInitialized = true;
       lastStreamedChunk = playerChunk;
-      for (int radiusStep = 0; radiusStep <= RENDER_RADIUS; ++radiusStep)
-        for (ChunkPos column : spiralAround(playerChunk, radiusStep)) {
-          int bottomY = playerChunk.y - 2;
-          if (bottomY > 0)
-            bottomY = 0;
-          for (int columnY = bottomY; columnY <= playerChunk.y; ++columnY) {
-            ChunkPos target{column.x, columnY, column.z};
-            if (!world.hasChunk(target) && !world.isKnownEmpty(target))
-              world.ensureChunk(target, voxelRegistry,
-                                biomeRegistry); // generates, dirties neighbors
-          }
-        }
+      requestGenJobs(playerChunk);
 
       for (auto chunkIterator = world.allChunks().begin();
            chunkIterator != world.allChunks().end();) {
         ChunkPos loadedPos = chunkIterator->first;
         if (horizontalDistance(loadedPos, playerChunk) > RENDER_RADIUS + 1) {
           chunkMeshes.erase(loadedPos);
+          dropMeshJobsFor(loadedPos);
+          dropGenJobsFor(loadedPos);
           chunkIterator = world.allChunks().erase(chunkIterator);
           world.evictEmpty(loadedPos);
           for (ChunkPos neighborPos :
@@ -169,13 +163,15 @@ void VulkanApplication::mainLoop() {
                 ChunkPos{loadedPos.x, loadedPos.y, loadedPos.z + 1}}) {
             Chunk *neighborChunk = world.getChunk(neighborPos);
             if (neighborChunk)
-              neighborChunk->dirty = true;
+              neighborChunk->markDirty();
           }
         } else {
           ++chunkIterator;
         }
       }
+      world.evictEmptyBeyond(playerChunk, RENDER_RADIUS + 1);
     }
+    drainGenJobs(playerChunk, 8);
 
     glfwPollEvents();
     input.update();
@@ -213,6 +209,110 @@ void VulkanApplication::mainLoop() {
 
     drawFrame();
   }
+}
+
+void VulkanApplication::requestGenJobs(const ChunkPos &playerChunk) {
+  std::vector<ChunkPos> wanted;
+  wanted.reserve(256);
+  for (int radiusStep = 0; radiusStep <= RENDER_RADIUS; ++radiusStep)
+    for (ChunkPos column : spiralAround(playerChunk, radiusStep)) {
+      int bottomY = playerChunk.y - 2;
+      if (bottomY > 0)
+        bottomY = 0;
+      for (int columnY = bottomY; columnY <= playerChunk.y; ++columnY) {
+        ChunkPos target{column.x, columnY, column.z};
+        if (world.hasChunk(target) || world.isKnownEmpty(target))
+          continue;
+        {
+          std::lock_guard<std::mutex> lock(genMutex);
+          if (genInFlight.contains(target))
+            continue;
+        }
+        wanted.push_back(target);
+      }
+    }
+  std::sort(wanted.begin(), wanted.end(),
+            [&playerChunk](const ChunkPos &a, const ChunkPos &b) {
+              int adx = a.x - playerChunk.x, adz = a.z - playerChunk.z;
+              int bdx = b.x - playerChunk.x, bdz = b.z - playerChunk.z;
+              int adh = adx * adx + adz * adz, bdh = bdx * bdx + bdz * bdz;
+              if (adh != bdh)
+                return adh < bdh;
+              int ady = a.y - playerChunk.y, bdy = b.y - playerChunk.y;
+              return ady * ady < bdy * bdy;
+            });
+  for (ChunkPos target : wanted) {
+    if (world.hasChunk(target) || world.isKnownEmpty(target))
+      continue;
+    {
+      std::lock_guard<std::mutex> lock(genMutex);
+      if (!genInFlight.insert(target).second)
+        continue;
+    }
+    // Worker generates into a local Chunk only
+    threadPool.enqueue([this, target] {
+      Chunk chunk;
+      chunk.pos = target;
+      generateChunkTerrain(chunk, voxelRegistry, biomeRegistry, world);
+      bool anySolid = false;
+      for (VoxelId id : chunk.voxels) {
+        if (id != AIR) {
+          anySolid = true;
+          break;
+        }
+      }
+      std::lock_guard<std::mutex> lock(genMutex);
+      completedGens.push(CompletedGen{target, std::move(chunk), !anySolid});
+    });
+  }
+}
+
+void VulkanApplication::drainGenJobs(const ChunkPos &playerChunk, int budget) {
+  for (int i = 0; i < budget; ++i) {
+    CompletedGen job;
+    {
+      std::lock_guard<std::mutex> lock(genMutex);
+      if (completedGens.empty())
+        return;
+      job = std::move(completedGens.front());
+      completedGens.pop();
+    }
+    const ChunkPos pos = job.pos;
+    // Drop staleresults player edits win
+    if (world.hasChunk(pos) || world.isKnownEmpty(pos)) {
+      std::lock_guard<std::mutex> lock(genMutex);
+      genInFlight.erase(pos);
+      continue;
+    }
+    if (horizontalDistance(pos, playerChunk) > RENDER_RADIUS + 1) {
+      std::lock_guard<std::mutex> lock(genMutex);
+      genInFlight.erase(pos);
+      continue;
+    }
+    if (job.empty) {
+      world.markKnownEmpty(pos);
+    } else {
+      world.publishGeneratedChunk(std::move(job.chunk));
+    }
+    {
+      std::lock_guard<std::mutex> lock(genMutex);
+      genInFlight.erase(pos);
+    }
+  }
+}
+
+void VulkanApplication::dropGenJobsFor(const ChunkPos &chunkPos) {
+  std::lock_guard<std::mutex> lock(genMutex);
+  genInFlight.erase(chunkPos);
+  if (completedGens.empty())
+    return;
+  std::queue<CompletedGen> kept;
+  while (!completedGens.empty()) {
+    if (!(completedGens.front().pos == chunkPos))
+      kept.push(std::move(completedGens.front()));
+    completedGens.pop();
+  }
+  completedGens = std::move(kept);
 }
 
 void VulkanApplication::cleanup() {

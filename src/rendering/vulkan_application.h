@@ -1,6 +1,12 @@
 #pragma once
 
+#include "utils/thread_pool.h"
+#include "voxels/chunk_mesher.h"
 #include <cstdint>
+#include <deque>
+#include <mutex>
+#include <queue>
+#include <unordered_set>
 #define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS 1
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
@@ -10,8 +16,8 @@
 
 #pragma once
 
-#include "../utils/input_manager.h"
 #include "../assets/asset_manager.h"
+#include "../utils/input_manager.h"
 #include "../voxels/biome.h"
 #include "../voxels/texture_atlas.h"
 #include "../voxels/voxel_registry.h"
@@ -102,6 +108,25 @@ private:
   std::unordered_map<ChunkPos, Mesh, ChunkPosHash> chunkMeshes;
   ChunkPos lastStreamedChunk{};
   bool streamInitialized = false;
+  ChunkPos currentPlayerChunk{}; // refreshed every frame in mainLoop
+
+  struct CompletedMesh {
+    ChunkPos pos;
+    MeshData data;
+    uint64_t version = 0;
+  };
+  std::mutex meshMutex;
+  std::deque<CompletedMesh> completedMeshes; // deque allows closest first scan
+  std::unordered_set<ChunkPos, ChunkPosHash> meshInFlight;
+
+  struct CompletedGen {
+    ChunkPos pos;
+    Chunk chunk;
+    bool empty = true;
+  };
+  std::mutex genMutex;
+  std::queue<CompletedGen> completedGens;
+  std::unordered_set<ChunkPos, ChunkPosHash> genInFlight;
 
   void initVulkan();
   void mainLoop();
@@ -152,8 +177,15 @@ private:
   void copyBuffer(vk::raii::Buffer &srcBuffer, vk::raii::Buffer &dstBuffer,
                   vk::DeviceSize size);
   Mesh uploadMeshData(const MeshData &meshData);
+
   void rebuildChunk(const ChunkPos &chunkPos);
   void updateDirtyChunks();
+  void kickMeshJobs();
+  void drainCompletedMeshes(int budget = 4);
+  void dropMeshJobsFor(const ChunkPos &chunkPos);
+  void requestGenJobs(const ChunkPos &playerChunk);
+  void drainGenJobs(const ChunkPos &playerChunk, int budget = 8);
+  void dropGenJobsFor(const ChunkPos &chunkPos);
 
   void createSyncObjects();
   void drawFrame();
@@ -167,6 +199,7 @@ private:
   AssetManager assetManager;
   VoxelRegistry voxelRegistry;
   BiomeRegistry biomeRegistry;
+  ThreadPool threadPool;
 
   static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(
       vk::DebugUtilsMessageSeverityFlagBitsEXT severity,

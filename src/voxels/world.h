@@ -96,6 +96,10 @@ public:
   size_t knownEmptyCount() const { return knownEmptyChunks.size(); }
   void evictEmpty(ChunkPos chunkPos) { knownEmptyChunks.erase(chunkPos); }
   void evictEmptyBeyond(ChunkPos playerChunk, int radius);
+  void markKnownEmpty(ChunkPos chunkPos) { knownEmptyChunks.insert(chunkPos); }
+  // Insert a worker generated chunk on the main thread. Returns false if a
+  // chunk (for example a player edit) or known empty marker covers this pos.
+  bool publishGeneratedChunk(Chunk &&chunk);
   void removeChunk(ChunkPos chunkPos) { storedChunks.erase(chunkPos); }
   auto &allChunks() { return storedChunks; }
   const auto &allChunks() const { return storedChunks; }

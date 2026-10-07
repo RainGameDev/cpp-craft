@@ -1,12 +1,13 @@
 #include "voxels/chunk_mesher.h"
 #include "voxels/voxel_registry.h"
+#include "voxels/world.h"
 
 static constexpr MesherFace FACES[6] = {
     // +X
     {.dir = {1, 0, 0},
      .corners = {{1, 0, 1}, {1, 0, 0}, {1, 1, 0}, {1, 1, 1}},
      .shade = 0.8f},
-    // -X
+    // minus X
     {.dir = {-1, 0, 0},
      .corners = {{0, 0, 0}, {0, 0, 1}, {0, 1, 1}, {0, 1, 0}},
      .shade = 0.8f},
@@ -14,7 +15,7 @@ static constexpr MesherFace FACES[6] = {
     {.dir = {0, 1, 0},
      .corners = {{0, 1, 1}, {1, 1, 1}, {1, 1, 0}, {0, 1, 0}},
      .shade = 1.0f},
-    // -Y (bottom)
+    // minus Y, bottom face
     {.dir = {0, -1, 0},
      .corners = {{1, 0, 1}, {0, 0, 1}, {0, 0, 0}, {1, 0, 0}},
      .shade = 0.5f},
@@ -22,7 +23,7 @@ static constexpr MesherFace FACES[6] = {
     {.dir = {0, 0, 1},
      .corners = {{0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1}},
      .shade = 0.7f},
-    // -Z (back)
+    // minus Z, back face
     {.dir = {0, 0, -1},
      .corners = {{1, 0, 0}, {0, 0, 0}, {0, 1, 0}, {1, 1, 0}},
      .shade = 0.7f},
@@ -40,9 +41,30 @@ bool shouldShowFace(const VoxelDef &currentDef, const VoxelDef &neighborDef) {
   return false;
 }
 
-MeshData meshChunk(const Chunk &chunk, const World &world,
-                   const VoxelRegistry &registry,
-                   const AtlasLayout &atlasLayout) {
+VoxelId snapshotBlockAt(const ChunkMeshSnapshot &snapshot, int worldX,
+                        int worldY, int worldZ) {
+  ChunkPos wanted = World::toChunkPos(worldX, worldY, worldZ);
+  const Chunk *target = nullptr;
+  if (wanted == snapshot.central.pos) {
+    target = &snapshot.central;
+  } else {
+    // Neighbor order matches face order.
+    for (size_t i = 0; i < 6; ++i) {
+      if (snapshot.neighbors[i] && snapshot.neighbors[i]->pos == wanted) {
+        target = &(*snapshot.neighbors[i]);
+        break;
+      }
+    }
+    if (!target)
+      return AIR; // missing neighbor chunk treat as empty
+  }
+  return target->getLocal(floorMod(worldX, CW), floorMod(worldY, CH),
+                          floorMod(worldZ, CD));
+}
+
+MeshData meshChunkWithGetter(
+    const Chunk &chunk, const std::function<VoxelId(int, int, int)> &getBlock,
+    const VoxelRegistry &registry, const AtlasLayout &atlasLayout) {
   MeshData mesh;
   mesh.reserve(1024, 1536);
 
@@ -65,7 +87,7 @@ MeshData meshChunk(const Chunk &chunk, const World &world,
 
         for (int faceIndex = 0; faceIndex < 6; ++faceIndex) {
           const MesherFace &face = FACES[faceIndex];
-          VoxelId neighborId = world.getBlock(
+          VoxelId neighborId = getBlock(
               worldX + face.dir[0], worldY + face.dir[1], worldZ + face.dir[2]);
           const VoxelDef &neighborDef = registry.get(neighborId);
           if (!shouldShowFace(voxelDef, neighborDef))
@@ -97,4 +119,24 @@ MeshData meshChunk(const Chunk &chunk, const World &world,
     }
   }
   return mesh;
+}
+
+MeshData meshChunkSnapshot(const ChunkMeshSnapshot &snapshot,
+                           const VoxelRegistry &registry,
+                           const AtlasLayout &atlasLayout) {
+  auto getter = [&snapshot](int x, int y, int z) {
+    return snapshotBlockAt(snapshot, x, y, z);
+  };
+  std::function<VoxelId(int, int, int)> fn = getter;
+  return meshChunkWithGetter(snapshot.central, fn, registry, atlasLayout);
+}
+
+MeshData meshChunk(const Chunk &chunk, const World &world,
+                   const VoxelRegistry &registry,
+                   const AtlasLayout &atlasLayout) {
+  auto getter = [&world](int x, int y, int z) {
+    return world.getBlock(x, y, z);
+  };
+  std::function<VoxelId(int, int, int)> fn = getter;
+  return meshChunkWithGetter(chunk, fn, registry, atlasLayout);
 }

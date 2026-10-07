@@ -65,7 +65,7 @@ VoxelId World::getBlock(int worldX, int worldY, int worldZ) const {
 void World::markNeighborDirty(ChunkPos chunkPos) {
   Chunk *neighbor = getChunk(chunkPos);
   if (neighbor)
-    neighbor->dirty = true;
+    neighbor->markDirty();
 }
 
 Chunk *World::ensureChunk(ChunkPos chunkPos, const VoxelRegistry &registry,
@@ -94,7 +94,7 @@ Chunk *World::ensureChunk(ChunkPos chunkPos, const VoxelRegistry &registry,
   }
 
   // mark neighbours as dirty
-  chunk.dirty = true;
+  chunk.markDirty();
   markNeighborDirty({chunkPos.x - 1, chunkPos.y, chunkPos.z});
   markNeighborDirty({chunkPos.x + 1, chunkPos.y, chunkPos.z});
   markNeighborDirty({chunkPos.x, chunkPos.y - 1, chunkPos.z});
@@ -102,6 +102,35 @@ Chunk *World::ensureChunk(ChunkPos chunkPos, const VoxelRegistry &registry,
   markNeighborDirty({chunkPos.x, chunkPos.y, chunkPos.z - 1});
   markNeighborDirty({chunkPos.x, chunkPos.y, chunkPos.z + 1});
   return &chunk;
+}
+
+bool World::publishGeneratedChunk(Chunk &&chunk) {
+  ChunkPos chunkPos = chunk.pos;
+  if (storedChunks.contains(chunkPos) || knownEmptyChunks.contains(chunkPos))
+    return false;
+  bool anySolid = false;
+  for (VoxelId voxelId : chunk.voxels) {
+    if (voxelId != AIR) {
+      anySolid = true;
+      break;
+    }
+  }
+  if (!anySolid) {
+    knownEmptyChunks.insert(chunkPos);
+    return false;
+  }
+  auto [it, inserted] = storedChunks.try_emplace(chunkPos, std::move(chunk));
+  if (!inserted)
+    return false;
+  it->second.generated = true;
+  it->second.markDirty();
+  markNeighborDirty({chunkPos.x - 1, chunkPos.y, chunkPos.z});
+  markNeighborDirty({chunkPos.x + 1, chunkPos.y, chunkPos.z});
+  markNeighborDirty({chunkPos.x, chunkPos.y - 1, chunkPos.z});
+  markNeighborDirty({chunkPos.x, chunkPos.y + 1, chunkPos.z});
+  markNeighborDirty({chunkPos.x, chunkPos.y, chunkPos.z - 1});
+  markNeighborDirty({chunkPos.x, chunkPos.y, chunkPos.z + 1});
+  return true;
 }
 
 void World::evictEmptyBeyond(ChunkPos playerChunk, int radius) {
@@ -123,6 +152,7 @@ void World::setBlock(int worldX, int worldY, int worldZ, VoxelId voxelId) {
   if (chunk.getLocal(localX, localY, localZ) == voxelId)
     return;
   chunk.setLocal(localX, localY, localZ, voxelId);
+  chunk.markDirty();
 
   // Faces on the chunk border are shared with the neighbor's mesh.
   if (localX == 0)

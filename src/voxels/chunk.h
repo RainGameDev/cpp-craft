@@ -1,6 +1,7 @@
 #pragma once
 #include "voxel_def.h"
 #include <array>
+#include <cstdint>
 inline constexpr int CW = 32, CH = 32, CD = 32;
 
 struct ChunkPos {
@@ -9,7 +10,8 @@ struct ChunkPos {
 };
 struct ChunkPosHash {
   size_t operator()(ChunkPos chunkPos) const noexcept {
-    return (size_t)(chunkPos.x * 73856093 ^ chunkPos.y * 19349663 ^ chunkPos.z * 83492791);
+    return (size_t)(chunkPos.x * 73856093 ^ chunkPos.y * 19349663 ^
+                    chunkPos.z * 83492791);
   }
 };
 
@@ -18,12 +20,16 @@ struct Chunk {
   std::array<VoxelId, CW * CH * CD> voxels{};
   bool dirty = true;
   bool generated = false;
+  // Incremented every time the chunk is marked dirty on the main thread.
+  uint64_t version = 0;
   static size_t idx(int x, int y, int z) {
     return (size_t)((y * CD + z) * CW + x);
   }
   VoxelId getLocal(int x, int y, int z) const { return voxels[idx(x, y, z)]; }
-  void setLocal(int x, int y, int z, VoxelId id) {
-    voxels[idx(x, y, z)] = id;
+  void setLocal(int x, int y, int z, VoxelId id) { voxels[idx(x, y, z)] = id; }
+  void markDirty() {
     dirty = true;
+    ++version;
   }
+  void markClean() { dirty = false; }
 };
