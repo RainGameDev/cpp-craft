@@ -74,10 +74,7 @@ MeshData meshChunk(const Chunk &chunk, const World &world,
           const uint32_t baseVertex =
               static_cast<uint32_t>(mesh.vertices.size());
           const auto &atlasCell = voxelDef.textureCoords[faceIndex];
-          // Half-texel inset so sampling stays inside the tile at every
-          // mip level instead of bleeding into neighbor tiles.
-          const float inset =
-              atlasLayout.tileSize > 0 ? 0.5f / atlasLayout.tileSize : 0.0f;
+          const float inset = 0.0;
           const float span = 1.0f - 2.0f * inset;
           for (int cornerIndex = 0; cornerIndex < 4; ++cornerIndex) {
             Vertex vertex;

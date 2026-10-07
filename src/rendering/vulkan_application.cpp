@@ -105,7 +105,7 @@ void VulkanApplication::initVulkan() {
   initImGui();
 }
 
-const uint16_t RENDER_RADIUS = 8;
+const uint16_t RENDER_RADIUS = 4;
 
 void VulkanApplication::mainLoop() {
   float lastTime = 0.0f;
