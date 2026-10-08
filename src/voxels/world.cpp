@@ -54,6 +54,7 @@ World::World() {
 }
 
 VoxelId World::getBlock(int worldX, int worldY, int worldZ) const {
+
   ChunkPos chunkPos = toChunkPos(worldX, worldY, worldZ);
   const Chunk *chunk = getChunk(chunkPos);
   if (!chunk)

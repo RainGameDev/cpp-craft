@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <iostream>
+#include <mutex>
 #include <stdexcept>
 
 void VulkanApplication::createSyncObjects() {

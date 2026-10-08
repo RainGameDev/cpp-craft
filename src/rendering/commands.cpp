@@ -98,6 +98,7 @@ void VulkanApplication::recordCommandBuffer(vk::raii::CommandBuffer &cmd,
     if (!inside)
       continue;
     Mesh &m = kv.second;
+    if (!*m.buffer || m.indexCount == 0) continue;
     cmd.bindVertexBuffers(0, {*m.buffer}, {m.vertexOffset});
     cmd.bindIndexBuffer(*m.buffer, m.indexOffset, vk::IndexType::eUint32);
     cmd.drawIndexed(m.indexCount, 1, 0, 0, 0);
