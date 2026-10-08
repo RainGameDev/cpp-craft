@@ -183,8 +183,6 @@ private:
                     vk::MemoryPropertyFlags properties,
                     vk::raii::Buffer &buffer,
                     vk::raii::DeviceMemory &bufferMemory);
-  void copyBuffer(vk::raii::Buffer &srcBuffer, vk::raii::Buffer &dstBuffer,
-                  vk::DeviceSize size);
   Mesh uploadMeshData(const MeshData &meshData);
 
   void rebuildChunk(const ChunkPos &chunkPos);
@@ -208,7 +206,8 @@ private:
   AssetManager assetManager;
   VoxelRegistry voxelRegistry;
   BiomeRegistry biomeRegistry;
-  ThreadPool threadPool;
+  ThreadPool meshThreadPool;
+  ThreadPool genThreadPool;
 
   static VKAPI_ATTR vk::Bool32 VKAPI_CALL debugCallback(
       vk::DebugUtilsMessageSeverityFlagBitsEXT severity,

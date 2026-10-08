@@ -29,33 +29,6 @@ void VulkanApplication::createBuffer(vk::DeviceSize size,
   buffer.bindMemory(*bufferMemory, 0);
 }
 
-void VulkanApplication::copyBuffer(vk::raii::Buffer &srcBuffer,
-                                   vk::raii::Buffer &dstBuffer,
-                                   vk::DeviceSize size) {
-  vk::CommandBufferAllocateInfo allocInfo{.commandPool = *commandPool,
-                                          .level =
-                                              vk::CommandBufferLevel::ePrimary,
-                                          .commandBufferCount = 1};
-
-  auto commandBuffers = vk::raii::CommandBuffers(device, allocInfo);
-  auto copyCommandBuffer = std::move(commandBuffers.front());
-
-  copyCommandBuffer.begin(
-      {.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
-
-  vk::BufferCopy copyRegion{.srcOffset = 0, .dstOffset = 0, .size = size};
-  copyCommandBuffer.copyBuffer(*srcBuffer, *dstBuffer, copyRegion);
-
-  copyCommandBuffer.end();
-
-  vk::raii::Fence copyFence(device, vk::FenceCreateInfo{});
-  vk::SubmitInfo submitInfo{.commandBufferCount = 1,
-                            .pCommandBuffers = &*copyCommandBuffer};
-
-  queue.submit(submitInfo, *copyFence);
-  std::ignore = device.waitForFences(*copyFence, vk::True, UINT64_MAX);
-}
-
 Mesh VulkanApplication::uploadMeshData(const MeshData &meshData) {
   Mesh mesh{};
   if (meshData.empty())
@@ -126,7 +99,7 @@ void VulkanApplication::rebuildChunk(const ChunkPos &chunkPos) {
 void VulkanApplication::kickMeshJobs() {
   static constexpr ChunkPos OFFSETS[6] = {{1, 0, 0},  {-1, 0, 0}, {0, 1, 0},
                                           {0, -1, 0}, {0, 0, 1},  {0, 0, -1}};
-  static constexpr int KICK_BUDGET = 16; // snapshots/frame; bounds memcpy
+  static constexpr int KICK_BUDGET = 32; // snapshots/frame; bounds memcpy
   AtlasLayout layout = voxelAtlas.layout();
   const ChunkPos center = currentPlayerChunk;
 
@@ -180,8 +153,8 @@ void VulkanApplication::kickMeshJobs() {
         snapshot.neighbors[i] = *neighbor;
     }
 
-    threadPool.enqueue([this, snapshot = std::move(snapshot), pos, version,
-                        layout]() mutable {
+    meshThreadPool.enqueue([this, snapshot = std::move(snapshot), pos, version,
+                            layout]() mutable {
       MeshData meshData = meshChunkSnapshot(snapshot, voxelRegistry, layout);
       std::lock_guard<std::mutex> lock(meshMutex);
       completedMeshes.push_back(
@@ -252,7 +225,7 @@ void VulkanApplication::dropMeshJobsFor(const ChunkPos &chunkPos) {
 
 void VulkanApplication::updateDirtyChunks() {
   kickMeshJobs();
-  drainCompletedMeshes(4);
+  drainCompletedMeshes(8);
 }
 
 void VulkanApplication::createStagingBuffer() {

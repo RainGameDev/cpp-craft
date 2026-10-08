@@ -252,7 +252,7 @@ void VulkanApplication::requestGenJobs(const ChunkPos &playerChunk) {
         continue;
     }
     // Worker generates into a local Chunk only
-    threadPool.enqueue([this, target] {
+    genThreadPool.enqueue([this, target] {
       Chunk chunk;
       chunk.pos = target;
       generateChunkTerrain(chunk, voxelRegistry, biomeRegistry, world);

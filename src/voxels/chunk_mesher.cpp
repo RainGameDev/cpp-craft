@@ -85,8 +85,8 @@ MeshData meshChunkSnapshot(const ChunkMeshSnapshot &snapshot,
             mesh.vertices.push_back(v);
           }
           mesh.indices.insert(mesh.indices.end(),
-              {baseVertex, baseVertex + 1, baseVertex + 2,
-               baseVertex, baseVertex + 2, baseVertex + 3});
+                              {baseVertex, baseVertex + 1, baseVertex + 2,
+                               baseVertex, baseVertex + 2, baseVertex + 3});
         }
       }
   return mesh;
