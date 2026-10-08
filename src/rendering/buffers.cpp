@@ -165,14 +165,21 @@ void VulkanApplication::kickMeshJobs() {
 }
 
 void VulkanApplication::drainCompletedMeshes(int budget) {
+  static constexpr vk::DeviceSize kBatchBytes = 8 * 1024 * 1024;
+  struct Pending {
+    CompletedMesh job;
+    vk::DeviceSize vertSize = 0, idxSize = 0, indexOffset = 0, total = 0;
+  };
+  std::vector<Pending> pending;
+  pending.reserve((size_t)budget);
+  vk::DeviceSize batchBytes = 0;
+
   for (int i = 0; i < budget; ++i) {
-    // Upload closest first: a far worker finishing early must not jump
-    // ahead of the player's own chunk.
     CompletedMesh job;
     {
       std::lock_guard<std::mutex> lock(meshMutex);
       if (completedMeshes.empty())
-        return;
+        break;
       size_t best = 0;
       long bestDist = LONG_MAX;
       for (size_t idx = 0; idx < completedMeshes.size(); ++idx) {
@@ -204,15 +211,95 @@ void VulkanApplication::drainCompletedMeshes(int budget) {
     }
     if (job.data.empty()) {
       chunkMeshes.erase(job.pos);
-    } else {
-      Mesh mesh = uploadMeshData(job.data);
-      chunkMeshes.insert_or_assign(job.pos, std::move(mesh));
-    }
-    chunk->markClean();
-    {
+      chunk->markClean();
       std::lock_guard<std::mutex> lock(meshMutex);
       meshInFlight.erase(job.pos);
+      continue;
     }
+    Pending pd;
+    pd.vertSize = sizeof(Vertex) * job.data.vertices.size();
+    pd.idxSize = sizeof(uint32_t) * job.data.indices.size();
+    pd.indexOffset = (pd.vertSize + 3) & ~vk::DeviceSize(3);
+    pd.total = pd.indexOffset + pd.idxSize;
+    if (pd.total > stagingSize) {
+      chunkMeshes.erase(job.pos);
+      chunk->markClean();
+      std::lock_guard<std::mutex> lock(meshMutex);
+      meshInFlight.erase(job.pos);
+      continue;
+    }
+    if (batchBytes + pd.total > kBatchBytes && !pending.empty()) {
+      std::lock_guard<std::mutex> lock(meshMutex);
+      completedMeshes.emplace_front(std::move(job));
+      break;
+    }
+    pd.job = std::move(job);
+    batchBytes += pd.total;
+    pending.push_back(std::move(pd));
+  }
+  if (pending.empty())
+    return;
+
+  // staging fill
+  std::vector<vk::BufferCopy> regions;
+  regions.reserve(pending.size() * 2);
+  std::vector<Mesh> meshes;
+  meshes.reserve(pending.size());
+  vk::DeviceSize stagingOffset = 0;
+  for (auto &pd : pending) {
+    memcpy(static_cast<char *>(stagingMapped) + stagingOffset,
+           pd.job.data.vertices.data(), pd.vertSize);
+    memcpy(static_cast<char *>(stagingMapped) + stagingOffset + pd.indexOffset,
+           pd.job.data.indices.data(), pd.idxSize);
+    Mesh mesh;
+    mesh.indexOffset = pd.indexOffset;
+    createBuffer(pd.total,
+                 vk::BufferUsageFlagBits::eVertexBuffer |
+                     vk::BufferUsageFlagBits::eIndexBuffer |
+                     vk::BufferUsageFlagBits::eTransferDst,
+                 vk::MemoryPropertyFlagBits::eDeviceLocal, mesh.buffer,
+                 mesh.memory);
+    regions.push_back({.srcOffset = stagingOffset,
+                       .dstOffset = mesh.vertexOffset,
+                       .size = pd.vertSize});
+    regions.push_back({.srcOffset = stagingOffset + pd.indexOffset,
+                       .dstOffset = mesh.indexOffset,
+                       .size = pd.idxSize});
+    mesh.vertexCount = (uint32_t)pd.job.data.vertices.size();
+    mesh.indexCount = (uint32_t)pd.job.data.indices.size();
+    meshes.push_back(std::move(mesh));
+    stagingOffset += pd.total;
+  }
+
+  vk::CommandBufferAllocateInfo alloc{.commandPool = *commandPool,
+                                      .level = vk::CommandBufferLevel::ePrimary,
+                                      .commandBufferCount = 1};
+  auto cb = vk::raii::CommandBuffers(device, alloc);
+  cb.front().begin({.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+  for (size_t mi = 0; mi < meshes.size(); ++mi) {
+    const vk::BufferCopy regs[2] = {{.srcOffset = regions[mi * 2].srcOffset,
+                                     .dstOffset = 0,
+                                     .size = regions[mi * 2].size},
+                                    {.srcOffset = regions[mi * 2 + 1].srcOffset,
+                                     .dstOffset = meshes[mi].indexOffset,
+                                     .size = regions[mi * 2 + 1].size}};
+    cb.front().copyBuffer(*stagingBuffer, *meshes[mi].buffer, regs);
+  }
+  cb.front().end();
+
+  vk::raii::Fence batchFence(device, vk::FenceCreateInfo{});
+  vk::CommandBuffer raw = *cb.front();
+  queue.submit(vk::SubmitInfo{.commandBufferCount = 1, .pCommandBuffers = &raw},
+               *batchFence);
+  std::ignore = device.waitForFences(*batchFence, vk::True, UINT64_MAX);
+
+  for (size_t mi = 0; mi < pending.size(); ++mi) {
+    ChunkPos pos = pending[mi].job.pos;
+    chunkMeshes.insert_or_assign(pos, std::move(meshes[mi]));
+    if (Chunk *chunk = world.getChunk(pos))
+      chunk->markClean();
+    std::lock_guard<std::mutex> lock(meshMutex);
+    meshInFlight.erase(pos);
   }
 }
 
