@@ -64,24 +64,20 @@ void generateChunkTerrain(Chunk &chunk, const VoxelRegistry &registry,
                           const BiomeRegistry &biomes, const World &world) {
 
   const int baseY = chunk.pos.y * CH;
-  std::unordered_map<std::string, std::array<VoxelId, 3>> idCache;
-  auto idsFor = [&](const Biome &b) {
-    if (auto f = idCache.find(b.name); f != idCache.end())
-      return f->second;
-    std::array<VoxelId, 3> ids = {registry.idFromString(b.topBlock),
-                                  registry.idFromString(b.subBlock),
-                                  registry.idFromString(b.stoneBlock)};
-    idCache.emplace(b.name, ids);
-    return ids;
-  };
-
-  // Snapshot biome
   std::vector<const Biome *> biomeList;
   biomeList.reserve(biomes.size());
   for (const auto &entry : biomes.all())
     biomeList.push_back(&entry.second);
   std::vector<float> weightBuf(biomeList.size(), 0.0f);
 
+  std::vector<std::array<VoxelId, 3>> idsPerBiome;
+  idsPerBiome.reserve(biomeList.size());
+  for (auto *b : biomeList)
+    idsPerBiome.push_back({registry.idFromString(b->topBlock),
+                           registry.idFromString(b->subBlock),
+                           registry.idFromString(b->stoneBlock)});
+
+  // Snapshot biome
   for (int localZ = 0; localZ < CD; ++localZ) {
     for (int localX = 0; localX < CW; ++localX) {
       int worldX = chunk.pos.x * CW + localX;
@@ -105,6 +101,7 @@ void generateChunkTerrain(Chunk &chunk, const VoxelRegistry &registry,
       float surface = 0.0f;
       float blendedSubDepth = 0.0f;
       const Biome *dominant = biomeList.empty() ? nullptr : biomeList[0];
+      size_t bestIdx = 0;
       float bestWeight = -1.0f;
       for (size_t i = 0; i < biomeList.size(); ++i) {
         const Biome *b = biomeList[i];
@@ -118,40 +115,31 @@ void generateChunkTerrain(Chunk &chunk, const VoxelRegistry &registry,
         if (w > bestWeight) {
           bestWeight = w;
           dominant = b;
+          bestIdx = i;
         }
       }
       if (!dominant)
         continue;
-      auto [topId, subId, stoneId] = idsFor(*dominant);
+      auto [topId, subId, stoneId] = idsPerBiome[bestIdx];
       float subBottom = surface - (1.0f + blendedSubDepth);
-      for (int localY = 0; localY < CH; ++localY) {
-        int worldY = baseY + localY;
-        VoxelId id;
-
-        if (worldY > surface)
-          id = AIR;
-        else if (worldY > surface - 1.0f)
-          id = topId;
-        else if (worldY > subBottom)
-          id = subId;
-        else
-          id = stoneId;
-
-        if (id != AIR && worldY < surface - 3) {
-          float fx = (float)worldX;
-          float fy = (float)worldY;
-          float fz = (float)worldZ;
-          float n1 = world.caveAt(fx, fy * 1.8f, fz);
-          float n2 = world.caveAt2(fx, fy * 1.8f, fz);
-          constexpr float tunnelW = 0.08f;
-          bool tunnel = std::abs(n1) < tunnelW && std::abs(n2) < tunnelW;
-          if (tunnel) {
+      const int topLocalY = (int)std::floor(surface) - baseY;
+      const int subBotLocalY = (int)std::floor(subBottom) - baseY;
+      const int topClamped =
+          topLocalY < -1 ? -1 : (topLocalY > CH - 1 ? CH - 1 : topLocalY);
+      const float fx = (float)worldX, fz = (float)worldZ;
+      for (int localY = 0; localY <= topClamped; ++localY) {
+        const int worldY = baseY + localY;
+        VoxelId id = (localY == topLocalY)
+                         ? topId
+                         : (localY > subBotLocalY ? subId : stoneId);
+        if (worldY < surface - 3) {
+          const float fy = (float)worldY;
+          if (std::abs(world.caveAt(fx, fy * 1.8f, fz)) < 0.08f &&
+              std::abs(world.caveAt2(fx, fy * 1.8f, fz)) < 0.08f)
             id = AIR;
-          } else if (worldY < surface - 6) {
-            float n3 = world.blobAt(fx, fy * 1.2f, fz);
-            if (n3 > 0.80f)
-              id = AIR;
-          }
+          else if (worldY < surface - 6 &&
+                   world.blobAt(fx, fy * 1.2f, fz) > 0.80f)
+            id = AIR;
         }
         chunk.setLocal(localX, localY, localZ, id);
       }
