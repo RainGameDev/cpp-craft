@@ -48,11 +48,13 @@ void VulkanApplication::copyBuffer(vk::raii::Buffer &srcBuffer,
 
   copyCommandBuffer.end();
 
+  vk::raii::Fence copyFence(device, vk::FenceCreateInfo{});
   vk::SubmitInfo submitInfo{.commandBufferCount = 1,
                             .pCommandBuffers = &*copyCommandBuffer};
 
-  queue.submit(submitInfo, nullptr);
-  queue.waitIdle();
+  queue.submit(submitInfo, *copyFence);
+  std::ignore =
+      device.waitForFences(*copyFence, vk::True, UINT64_MAX);
 }
 
 Mesh VulkanApplication::uploadMeshData(const MeshData &meshData) {

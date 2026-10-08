@@ -12,18 +12,23 @@ void VulkanApplication::createCommandPool() {
 }
 
 void VulkanApplication::createCommandBuffer() {
-  vk::CommandBufferAllocateInfo allocInfo{.commandPool = commandPool,
+  commandBuffers.clear();
+  vk::CommandBufferAllocateInfo allocInfo{.commandPool = *commandPool,
                                           .level =
                                               vk::CommandBufferLevel::ePrimary,
-                                          .commandBufferCount = 1};
-  commandBuffer =
-      std::move(vk::raii::CommandBuffers(device, allocInfo).front());
+                                          .commandBufferCount =
+                                              maxConcurrentFrames};
+  auto allocated = vk::raii::CommandBuffers(device, allocInfo);
+  for (auto &b : allocated)
+    commandBuffers.emplace_back(std::move(b));
 }
 
-void VulkanApplication::recordCommandBuffer(uint32_t imageIndex,
-                                            uint32_t currentFrame) {
-  commandBuffer.begin({});
-  transition_image_layout(imageIndex, vk::ImageLayout::eUndefined,
+void VulkanApplication::recordCommandBuffer(vk::raii::CommandBuffer &cmd,
+                                            uint32_t imageIndex,
+                                            uint32_t frameIndex) {
+  cmd.reset();
+  cmd.begin({});
+  transition_image_layout(cmd, imageIndex, vk::ImageLayout::eUndefined,
                           vk::ImageLayout::eColorAttachmentOptimal, {},
                           vk::AccessFlagBits2::eColorAttachmentWrite,
                           vk::PipelineStageFlagBits2::eColorAttachmentOutput,
@@ -52,46 +57,45 @@ void VulkanApplication::recordCommandBuffer(uint32_t imageIndex,
       .pColorAttachments = &attachmentInfo,
       .pDepthAttachment = &depthAttachmentInfo};
 
-  commandBuffer.beginRendering(renderingInfo);
+  cmd.beginRendering(renderingInfo);
 
-  commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
-                             isWirframe ? wireframePipeline
-                                        : *graphicsPipeline);
+  cmd.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                   isWirframe ? wireframePipeline : *graphicsPipeline);
 
-  commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                                   *pipelineLayout, 0,
-                                   {*descriptorSets[currentFrame]}, nullptr);
+  cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipelineLayout, 0,
+                         {*descriptorSets[frameIndex]}, nullptr);
 
-  commandBuffer.setViewport(
+  cmd.setViewport(
       0, vk::Viewport(0.0f, 0.0f, static_cast<float>(swapChainExtent.width),
                       static_cast<float>(swapChainExtent.height), 0.0f, 1.0f));
-  commandBuffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), swapChainExtent));
+  cmd.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), swapChainExtent));
 
   // render all chunk meshes
   for (auto &chunkEntry : chunkMeshes) {
     Mesh &mesh = chunkEntry.second;
-    commandBuffer.bindVertexBuffers(0, {*mesh.vertexBuffer}, {0});
-    commandBuffer.bindIndexBuffer(*mesh.indexBuffer, 0, vk::IndexType::eUint32);
-    commandBuffer.drawIndexed(mesh.indexCount, 1, 0, 0, 0);
+    cmd.bindVertexBuffers(0, {*mesh.vertexBuffer}, {0});
+    cmd.bindIndexBuffer(*mesh.indexBuffer, 0, vk::IndexType::eUint32);
+    cmd.drawIndexed(mesh.indexCount, 1, 0, 0, 0);
   }
 
   // render imgui
-  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), *commandBuffer,
-                                  VK_NULL_HANDLE);
+  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), *cmd, VK_NULL_HANDLE);
 
-  commandBuffer.endRendering();
+  cmd.endRendering();
 
-  transition_image_layout(imageIndex, vk::ImageLayout::eColorAttachmentOptimal,
+  transition_image_layout(cmd, imageIndex,
+                          vk::ImageLayout::eColorAttachmentOptimal,
                           vk::ImageLayout::ePresentSrcKHR,
                           vk::AccessFlagBits2::eColorAttachmentWrite, {},
                           vk::PipelineStageFlagBits2::eColorAttachmentOutput,
                           vk::PipelineStageFlagBits2::eBottomOfPipe);
 
-  commandBuffer.end();
+  cmd.end();
 }
 
 void VulkanApplication::transition_image_layout(
-    uint32_t imageIndex, vk::ImageLayout oldLayout, vk::ImageLayout newLayout,
+    vk::raii::CommandBuffer &cmd, uint32_t imageIndex,
+    vk::ImageLayout oldLayout, vk::ImageLayout newLayout,
     vk::AccessFlags2 srcAccessMask, vk::AccessFlags2 dstAccessMask,
     vk::PipelineStageFlags2 srcStageMask,
     vk::PipelineStageFlags2 dstStageMask) {
@@ -113,5 +117,5 @@ void VulkanApplication::transition_image_layout(
   vk::DependencyInfo dependencyInfo = {.dependencyFlags = {},
                                        .imageMemoryBarrierCount = 1,
                                        .pImageMemoryBarriers = &barrier};
-  commandBuffer.pipelineBarrier2(dependencyInfo);
+  cmd.pipelineBarrier2(dependencyInfo);
 }

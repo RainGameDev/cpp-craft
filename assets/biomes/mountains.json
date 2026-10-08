@@ -1,7 +1,7 @@
 {
   "name": "game:mountains",
   "baseHeight": 18.0,
-  "amplitude": 32.0,
+  "amplitude": 74.0,
   "frequency": 0.003,
   "topBlock": "game:grass",
   "subBlock": "game:dirt",

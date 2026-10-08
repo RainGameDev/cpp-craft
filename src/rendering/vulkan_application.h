@@ -82,10 +82,10 @@ private:
   vk::raii::Pipeline graphicsPipeline = nullptr;
   vk::raii::Pipeline wireframePipeline = nullptr;
   vk::raii::CommandPool commandPool = nullptr;
-  vk::raii::CommandBuffer commandBuffer = nullptr;
-  vk::raii::Semaphore presentCompleteSemaphore = nullptr;
-  vk::raii::Semaphore renderFinishedSemaphore = nullptr;
-  vk::raii::Fence drawFence = nullptr;
+  std::vector<vk::raii::CommandBuffer> commandBuffers;
+  std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
+  std::vector<vk::raii::Semaphore> renderFinishedSemaphores;
+  std::vector<vk::raii::Fence> drawFences;
   std::vector<const char *> requiredDeviceExtension = {
       vk::KHRSwapchainExtensionName};
 
@@ -156,8 +156,11 @@ private:
   void createGraphicsPipeline();
   void createCommandPool();
   void createCommandBuffer();
-  void recordCommandBuffer(uint32_t imageIndex, uint32_t currentFrame);
-  void transition_image_layout(uint32_t imageIndex, vk::ImageLayout old_layout,
+  void recordCommandBuffer(vk::raii::CommandBuffer &cmd, uint32_t imageIndex,
+                           uint32_t frameIndex);
+  void transition_image_layout(vk::raii::CommandBuffer &cmd,
+                               uint32_t imageIndex,
+                               vk::ImageLayout old_layout,
                                vk::ImageLayout new_layout,
                                vk::AccessFlags2 src_access_mask,
                                vk::AccessFlags2 dst_access_mask,

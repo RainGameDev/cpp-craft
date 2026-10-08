@@ -177,8 +177,6 @@ void VulkanApplication::mainLoop() {
     input.update();
     processInput(deltaTime);
 
-    updateUniformBuffer(currentFrame);
-
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
