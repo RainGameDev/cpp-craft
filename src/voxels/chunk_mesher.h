@@ -124,7 +124,7 @@ MeshData meshChunkWithGetter(const Chunk &chunk, F &&getBlock,
             vertex.pos = glm::vec3(worldX + face.corners[cornerIndex][0],
                                    worldY + face.corners[cornerIndex][1],
                                    worldZ + face.corners[cornerIndex][2]);
-            vertex.color = glm::vec3(face.shade);
+            vertex.shade = face.shade;
             vertex.uv = glm::vec2(
                 (atlasCell[0] + inset + FACE_UV[cornerIndex][0] * span) /
                     atlasLayout.columns,

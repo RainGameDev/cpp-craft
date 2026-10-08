@@ -79,7 +79,7 @@ MeshData meshChunkSnapshot(const ChunkMeshSnapshot &snapshot,
             v.pos = glm::vec3(baseX + localX + face.corners[c][0],
                               baseY + localY + face.corners[c][1],
                               baseZ + localZ + face.corners[c][2]);
-            v.color = glm::vec3(face.shade);
+            v.shade = face.shade;
             v.uv = glm::vec2((cell[0] + FACE_UV[c][0]) / atlasLayout.columns,
                              (cell[1] + FACE_UV[c][1]) / atlasLayout.rows);
             mesh.vertices.push_back(v);

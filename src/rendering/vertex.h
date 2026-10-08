@@ -9,7 +9,7 @@
 
 struct Vertex {
   glm::vec3 pos;
-  glm::vec3 color;
+  float shade;
   glm::vec2 uv;
 
   static vk::VertexInputBindingDescription getBindingDescription() {
@@ -26,8 +26,8 @@ struct Vertex {
               .offset = offsetof(Vertex, pos)},
              {.location = 1,
               .binding = 0,
-              .format = vk::Format::eR32G32B32Sfloat,
-              .offset = offsetof(Vertex, color)},
+              .format = vk::Format::eR32Sfloat,
+              .offset = offsetof(Vertex, shade)},
              {              .location = 2,
               .binding = 0,
               .format = vk::Format::eR32G32Sfloat,
