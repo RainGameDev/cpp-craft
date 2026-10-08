@@ -12,5 +12,15 @@
   "humidityCenter": -0.5,
   "humidityRadius": 0.5,
   "elevCenter": 42.0,
-  "elevRadius": 15.0
+  "elevRadius": 15.0,
+  "decorations": [
+    {
+      "type": "cactus",
+      "block": "game:cactus",
+      "density": 0.35,
+      "soils": [
+        "game:sand"
+      ]
+    }
+  ]
 }

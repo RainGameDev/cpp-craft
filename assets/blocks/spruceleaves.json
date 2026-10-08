@@ -1,0 +1,9 @@
+{
+  "name": "game:spruceleaves",
+  "opaque": false,
+  "solid": true,
+  "tickable": false,
+  "render": "cutout",
+  "textures": { "all": "spruceleaves" },
+  "components": { "BreakTime": 0.2, "Drops": [] }
+}

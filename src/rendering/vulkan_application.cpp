@@ -93,6 +93,7 @@ void VulkanApplication::initVulkan() {
 
   biomeRegistry.loadFromDir("assets/biomes");
   std::print("loaded {} biomes\n", biomeRegistry.size());
+  biomeRegistry.validateBlocks(voxelRegistry);
 
   camera = Camera(glm::vec3(24.0f, 80.0f, -8.0f), glm::vec3(0.0f, 1.0f, 0.0f),
                   108.0f, -35.0f);

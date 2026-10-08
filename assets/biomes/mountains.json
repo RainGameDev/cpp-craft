@@ -12,5 +12,120 @@
   "humidityCenter": 0.0,
   "humidityRadius": 1.4,
   "elevCenter": 150.0,
-  "elevRadius": 55.0
+  "elevRadius": 55.0,
+  "decorations": [
+    {
+      "type": "tree",
+      "shape": {
+        "trunk": {
+          "min": 6,
+          "max": 9
+        },
+        "thin": 0.06,
+        "defaultSoils": [
+          "game:grass",
+          "game:podzol",
+          "game:dirt"
+        ],
+        "canopy": [
+          {
+            "fromBase": 2,
+            "toTop": -1,
+            "radiusBottom": 2,
+            "radiusTop": 1
+          },
+          {
+            "dy": 0,
+            "radius": 1,
+            "mode": "plus"
+          },
+          {
+            "dy": 1,
+            "radius": 0
+          }
+        ]
+      },
+      "log": "game:sprucelog",
+      "leaves": "game:spruceleaves",
+      "density": 0.17,
+      "soils": [
+        "game:grass",
+        "game:podzol",
+        "game:dirt"
+      ]
+    },
+    {
+      "type": "tree",
+      "shape": {
+        "trunk": {
+          "min": 4,
+          "max": 6
+        },
+        "thin": 0.06,
+        "defaultSoils": [
+          "game:grass",
+          "game:podzol",
+          "game:mud",
+          "game:dirt"
+        ],
+        "canopy": [
+          {
+            "dy": -1,
+            "radius": 2
+          },
+          {
+            "dy": 0,
+            "radius": 2
+          },
+          {
+            "dy": 1,
+            "radius": 1
+          },
+          {
+            "dy": 2,
+            "radius": 1
+          }
+        ]
+      },
+      "log": "game:oaklog",
+      "leaves": "game:oakleaves",
+      "density": 0.11,
+      "soils": [
+        "game:grass",
+        "game:podzol",
+        "game:mud",
+        "game:dirt"
+      ]
+    },
+    {
+      "type": "tree",
+      "shape": {
+        "trunk": {
+          "min": 4,
+          "max": 6
+        },
+        "thin": 0.06,
+        "defaultSoils": [
+          "game:redsand",
+          "game:clay",
+          "game:grass"
+        ],
+        "canopy": [
+          {
+            "dy": 0,
+            "radius": 2
+          },
+          {
+            "dy": 1,
+            "radius": 2
+          }
+        ]
+      },
+      "log": "game:acacialog",
+      "leaves": "game:acacialeaves",
+      "density": 0.28,
+      "minTemp": 0.25,
+      "maxHumidity": 0.1
+    }
+  ]
 }

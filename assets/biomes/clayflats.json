@@ -12,5 +12,40 @@
   "humidityCenter": 0.0,
   "humidityRadius": 0.35,
   "elevCenter": 40.0,
-  "elevRadius": 12.0
+  "elevRadius": 12.0,
+  "decorations": [
+    {
+      "type": "tree",
+      "shape": {
+        "trunk": {
+          "min": 4,
+          "max": 6
+        },
+        "thin": 0.06,
+        "defaultSoils": [
+          "game:redsand",
+          "game:clay",
+          "game:grass"
+        ],
+        "canopy": [
+          {
+            "dy": 0,
+            "radius": 2
+          },
+          {
+            "dy": 1,
+            "radius": 2
+          }
+        ]
+      },
+      "log": "game:acacialog",
+      "leaves": "game:acacialeaves",
+      "density": 0.28,
+      "soils": [
+        "game:redsand",
+        "game:clay",
+        "game:grass"
+      ]
+    }
+  ]
 }

@@ -1,0 +1,9 @@
+{
+  "name": "game:birchleaves",
+  "opaque": false,
+  "solid": true,
+  "tickable": false,
+  "render": "cutout",
+  "textures": { "all": "birchleaves" },
+  "components": { "BreakTime": 0.2, "Drops": [] }
+}

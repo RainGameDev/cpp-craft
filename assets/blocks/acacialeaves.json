@@ -1,0 +1,9 @@
+{
+  "name": "game:acacialeaves",
+  "opaque": false,
+  "solid": true,
+  "tickable": false,
+  "render": "cutout",
+  "textures": { "all": "acacialeaves" },
+  "components": { "BreakTime": 0.2, "Drops": [] }
+}

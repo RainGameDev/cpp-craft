@@ -1,0 +1,9 @@
+{
+  "name": "game:acacialog",
+  "opaque": true,
+  "solid": true,
+  "tickable": false,
+  "render": "cube",
+  "textures": { "all": "acacialog" },
+  "components": { "BreakTime": 2.0, "Drops": ["game:item:acacialog"] }
+}

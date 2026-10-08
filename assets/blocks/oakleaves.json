@@ -1,0 +1,9 @@
+{
+  "name": "game:oakleaves",
+  "opaque": false,
+  "solid": true,
+  "tickable": false,
+  "render": "cutout",
+  "textures": { "all": "oakleaves" },
+  "components": { "BreakTime": 0.2, "Drops": [] }
+}

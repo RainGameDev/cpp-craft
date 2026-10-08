@@ -1,0 +1,84 @@
+{
+  "name": "game:forest",
+  "heightOffset": 0.0,
+  "terrace": 0.0,
+  "roughness": 1.0,
+  "topBlock": "game:grass",
+  "subBlock": "game:dirt",
+  "subDepth": 3,
+  "stoneBlock": "game:stone",
+  "tempCenter": 0.0,
+  "tempRadius": 0.33,
+  "humidityCenter": 0.25,
+  "humidityRadius": 0.33,
+  "elevCenter": 55.0,
+  "elevRadius": 20.0,
+  "decorations": [
+    {
+      "type": "tree",
+      "shape": {
+        "trunk": {
+          "min": 4,
+          "max": 6
+        },
+        "thin": 0.06,
+        "defaultSoils": ["game:grass", "game:podzol", "game:mud", "game:dirt"],
+        "canopy": [
+          {
+            "dy": -1,
+            "radius": 2
+          },
+          {
+            "dy": 0,
+            "radius": 2
+          },
+          {
+            "dy": 1,
+            "radius": 1
+          },
+          {
+            "dy": 2,
+            "radius": 1
+          }
+        ]
+      },
+      "log": "game:oaklog",
+      "leaves": "game:oakleaves",
+      "density": 0.75,
+      "soils": ["game:grass", "game:podzol", "game:mud", "game:dirt"]
+    },
+    {
+      "type": "tree",
+      "shape": {
+        "trunk": {
+          "min": 5,
+          "max": 7
+        },
+        "thin": 0.06,
+        "defaultSoils": ["game:grass", "game:podzol", "game:dirt"],
+        "canopy": [
+          {
+            "dy": -1,
+            "radius": 2
+          },
+          {
+            "dy": 0,
+            "radius": 1
+          },
+          {
+            "dy": 1,
+            "radius": 1
+          },
+          {
+            "dy": 2,
+            "radius": 1
+          }
+        ]
+      },
+      "log": "game:birchlog",
+      "leaves": "game:birchleaves",
+      "density": 0.2,
+      "soils": ["game:grass", "game:podzol", "game:dirt"]
+    }
+  ]
+}

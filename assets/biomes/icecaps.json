@@ -12,5 +12,9 @@
   "humidityCenter": 0.4,
   "humidityRadius": 0.45,
   "elevCenter": 38.0,
-  "elevRadius": 16.0
+  "elevRadius": 16.0,
+  "waterBedBlock": "game:sand",
+  "waterDeepBlock": "game:clay",
+  "waterBedDepth": 6.0,
+  "waterFlatBlock": "game:snow"
 }

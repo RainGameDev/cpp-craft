@@ -1,0 +1,9 @@
+{
+  "name": "game:oaklog",
+  "opaque": true,
+  "solid": true,
+  "tickable": false,
+  "render": "cube",
+  "textures": { "all": "oaklog" },
+  "components": { "BreakTime": 2.0, "Drops": ["game:item:oaklog"] }
+}

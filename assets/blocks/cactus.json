@@ -1,0 +1,9 @@
+{
+  "name": "game:cactus",
+  "opaque": true,
+  "solid": true,
+  "tickable": false,
+  "render": "cube",
+  "textures": { "all": "cactus" },
+  "components": { "BreakTime": 0.4, "Drops": ["game:item:cactus"] }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "game:sprucelog",
+  "opaque": true,
+  "solid": true,
+  "tickable": false,
+  "render": "cube",
+  "textures": { "all": "sprucelog" },
+  "components": { "BreakTime": 2.0, "Drops": ["game:item:sprucelog"] }
+}
