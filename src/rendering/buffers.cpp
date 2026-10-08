@@ -53,8 +53,7 @@ void VulkanApplication::copyBuffer(vk::raii::Buffer &srcBuffer,
                             .pCommandBuffers = &*copyCommandBuffer};
 
   queue.submit(submitInfo, *copyFence);
-  std::ignore =
-      device.waitForFences(*copyFence, vk::True, UINT64_MAX);
+  std::ignore = device.waitForFences(*copyFence, vk::True, UINT64_MAX);
 }
 
 Mesh VulkanApplication::uploadMeshData(const MeshData &meshData) {
@@ -62,47 +61,47 @@ Mesh VulkanApplication::uploadMeshData(const MeshData &meshData) {
   if (meshData.empty())
     return mesh;
 
-  vk::DeviceSize vertexBufferSize = sizeof(Vertex) * meshData.vertices.size();
-  vk::raii::Buffer vertexStagingBuffer{nullptr};
-  vk::raii::DeviceMemory vertexStagingMemory{nullptr};
-  createBuffer(vertexBufferSize, vk::BufferUsageFlagBits::eTransferSrc,
-               vk::MemoryPropertyFlagBits::eHostVisible |
-                   vk::MemoryPropertyFlagBits::eHostCoherent,
-               vertexStagingBuffer, vertexStagingMemory);
+  const vk::DeviceSize vertSize = sizeof(Vertex) * meshData.vertices.size();
+  const vk::DeviceSize idxSize = sizeof(uint32_t) * meshData.indices.size();
+  mesh.indexOffset = (vertSize + 3) & ~vk::DeviceSize(3);
+  const vk::DeviceSize total = mesh.indexOffset + idxSize;
+  if (total > stagingSize)
+    return mesh; // oversize fallback skip or temp path
 
-  void *mappedVertices = vertexStagingMemory.mapMemory(0, vertexBufferSize);
-  std::memcpy(mappedVertices, meshData.vertices.data(), vertexBufferSize);
-  vertexStagingMemory.unmapMemory();
+  memcpy(stagingMapped, meshData.vertices.data(), vertSize);
+  memcpy(static_cast<char *>(stagingMapped) + mesh.indexOffset,
+         meshData.indices.data(), idxSize);
 
-  createBuffer(vertexBufferSize,
+  createBuffer(total,
                vk::BufferUsageFlagBits::eVertexBuffer |
+                   vk::BufferUsageFlagBits::eIndexBuffer |
                    vk::BufferUsageFlagBits::eTransferDst,
-               vk::MemoryPropertyFlagBits::eDeviceLocal, mesh.vertexBuffer,
-               mesh.vertexMemory);
+               vk::MemoryPropertyFlagBits::eDeviceLocal, mesh.buffer,
+               mesh.memory);
 
-  copyBuffer(vertexStagingBuffer, mesh.vertexBuffer, vertexBufferSize);
+  // submit
+  vk::CommandBufferAllocateInfo alloc{.commandPool = *commandPool,
+                                      .level = vk::CommandBufferLevel::ePrimary,
+                                      .commandBufferCount = 1};
+  auto cb = vk::raii::CommandBuffers(device, alloc);
+  cb.front().begin({.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+  const std::array<vk::BufferCopy, 2> regions{{
+      {.srcOffset = 0, .dstOffset = mesh.vertexOffset, .size = vertSize},
+      {.srcOffset = mesh.indexOffset,
+       .dstOffset = mesh.indexOffset,
+       .size = idxSize},
+  }};
+  cb.front().copyBuffer(*stagingBuffer, *mesh.buffer, regions);
+  cb.front().end();
 
-  vk::DeviceSize indexBufferSize = sizeof(uint32_t) * meshData.indices.size();
-  vk::raii::Buffer indexStagingBuffer{nullptr};
-  vk::raii::DeviceMemory indexStagingMemory{nullptr};
-  createBuffer(indexBufferSize, vk::BufferUsageFlagBits::eTransferSrc,
-               vk::MemoryPropertyFlagBits::eHostVisible |
-                   vk::MemoryPropertyFlagBits::eHostCoherent,
-               indexStagingBuffer, indexStagingMemory);
+  vk::raii::Fence f(device, vk::FenceCreateInfo{});
+  vk::CommandBuffer raw = *cb.front();
+  queue.submit(vk::SubmitInfo{.commandBufferCount = 1, .pCommandBuffers = &raw},
+               *f);
+  std::ignore = device.waitForFences(*f, vk::True, UINT64_MAX);
 
-  void *mappedIndices = indexStagingMemory.mapMemory(0, indexBufferSize);
-  std::memcpy(mappedIndices, meshData.indices.data(), indexBufferSize);
-  indexStagingMemory.unmapMemory();
-
-  createBuffer(indexBufferSize,
-               vk::BufferUsageFlagBits::eIndexBuffer |
-                   vk::BufferUsageFlagBits::eTransferDst,
-               vk::MemoryPropertyFlagBits::eDeviceLocal, mesh.indexBuffer,
-               mesh.indexMemory);
-
-  copyBuffer(indexStagingBuffer, mesh.indexBuffer, indexBufferSize);
-
-  mesh.indexCount = static_cast<uint32_t>(meshData.indices.size());
+  mesh.vertexCount = (uint32_t)meshData.vertices.size();
+  mesh.indexCount = (uint32_t)meshData.indices.size();
   return mesh;
 }
 
@@ -185,7 +184,8 @@ void VulkanApplication::kickMeshJobs() {
                         layout]() mutable {
       MeshData meshData = meshChunkSnapshot(snapshot, voxelRegistry, layout);
       std::lock_guard<std::mutex> lock(meshMutex);
-      completedMeshes.push_back(CompletedMesh{pos, std::move(meshData), version});
+      completedMeshes.push_back(
+          CompletedMesh{pos, std::move(meshData), version});
     });
     ++kicked;
   }
@@ -204,8 +204,7 @@ void VulkanApplication::drainCompletedMeshes(int budget) {
       long bestDist = LONG_MAX;
       for (size_t idx = 0; idx < completedMeshes.size(); ++idx) {
         const ChunkPos &pp = completedMeshes[idx].pos;
-        int dx = pp.x - currentPlayerChunk.x,
-            dy = pp.y - currentPlayerChunk.y,
+        int dx = pp.x - currentPlayerChunk.x, dy = pp.y - currentPlayerChunk.y,
             dz = pp.z - currentPlayerChunk.z;
         long d = (long)dx * dx + (long)dy * dy + (long)dz * dz;
         if (d < bestDist) {
@@ -254,4 +253,12 @@ void VulkanApplication::dropMeshJobsFor(const ChunkPos &chunkPos) {
 void VulkanApplication::updateDirtyChunks() {
   kickMeshJobs();
   drainCompletedMeshes(4);
+}
+
+void VulkanApplication::createStagingBuffer() {
+  createBuffer(stagingSize, vk::BufferUsageFlagBits::eTransferSrc,
+               vk::MemoryPropertyFlagBits::eHostVisible |
+                   vk::MemoryPropertyFlagBits::eHostCoherent,
+               stagingBuffer, stagingMemory);
+  stagingMapped = stagingMemory.mapMemory(0, stagingSize);
 }

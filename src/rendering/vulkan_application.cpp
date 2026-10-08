@@ -70,6 +70,10 @@ void VulkanApplication::initVulkan() {
   createSwapChain();
   createImageViews();
   createCommandPool();
+
+  createCommandPool();
+  createStagingBuffer();
+
   createDepthResources();
   createDescriptorSetLayout();
   assetManager.addLoader(std::make_unique<TextureLoader>(

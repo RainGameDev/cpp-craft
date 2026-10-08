@@ -7,9 +7,11 @@
 #include <vulkan/vulkan_raii.hpp>
 
 struct Mesh {
-  vk::raii::Buffer vertexBuffer{nullptr};
-  vk::raii::DeviceMemory vertexMemory{nullptr};
-  vk::raii::Buffer indexBuffer{nullptr};
-  vk::raii::DeviceMemory indexMemory{nullptr};
+  vk::raii::Buffer buffer{nullptr};
+  vk::raii::DeviceMemory memory{nullptr};
+  vk::DeviceSize vertexOffset = 0;
+  vk::DeviceSize indexOffset = 0;
+  uint32_t vertexCount = 0;
   uint32_t indexCount = 0;
+  bool empty() const { return indexCount == 0 || !*buffer; }
 };

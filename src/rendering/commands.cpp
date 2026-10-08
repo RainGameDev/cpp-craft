@@ -13,11 +13,10 @@ void VulkanApplication::createCommandPool() {
 
 void VulkanApplication::createCommandBuffer() {
   commandBuffers.clear();
-  vk::CommandBufferAllocateInfo allocInfo{.commandPool = *commandPool,
-                                          .level =
-                                              vk::CommandBufferLevel::ePrimary,
-                                          .commandBufferCount =
-                                              maxConcurrentFrames};
+  vk::CommandBufferAllocateInfo allocInfo{
+      .commandPool = *commandPool,
+      .level = vk::CommandBufferLevel::ePrimary,
+      .commandBufferCount = maxConcurrentFrames};
   auto allocated = vk::raii::CommandBuffers(device, allocInfo);
   for (auto &b : allocated)
     commandBuffers.emplace_back(std::move(b));
@@ -70,12 +69,38 @@ void VulkanApplication::recordCommandBuffer(vk::raii::CommandBuffer &cmd,
                       static_cast<float>(swapChainExtent.height), 0.0f, 1.0f));
   cmd.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), swapChainExtent));
 
-  // render all chunk meshes
-  for (auto &chunkEntry : chunkMeshes) {
-    Mesh &mesh = chunkEntry.second;
-    cmd.bindVertexBuffers(0, {*mesh.vertexBuffer}, {0});
-    cmd.bindIndexBuffer(*mesh.indexBuffer, 0, vk::IndexType::eUint32);
-    cmd.drawIndexed(mesh.indexCount, 1, 0, 0, 0);
+  auto proj = camera.getProjectionMatrix(swapChainExtent.width /
+                                         (float)swapChainExtent.height);
+  proj[1][1] *= -1;
+  glm::mat4 vp = proj * camera.getViewMatrix();
+  auto row = [&](int r) {
+    return glm::vec4(vp[0][r], vp[1][r], vp[2][r], vp[3][r]);
+  };
+  glm::vec4 planes[6] = {row(3) + row(0), row(3) - row(0), row(3) + row(1),
+                         row(3) - row(1), row(3) + row(2), row(3) - row(2)};
+  for (auto &pl : planes)
+    pl /= glm::length(glm::vec3(pl));
+
+  constexpr float pad = 2.0f;
+  for (auto &kv : chunkMeshes) {
+    const ChunkPos &p = kv.first;
+    glm::vec3 mn(p.x * CW - pad, p.y * CH - pad, p.z * CD - pad);
+    glm::vec3 mx(p.x * CW + CW + pad, p.y * CH + CH + pad, p.z * CD + CD + pad);
+    bool inside = true;
+    for (auto &pl : planes) {
+      glm::vec3 pv(pl.x > 0 ? mx.x : mn.x, pl.y > 0 ? mx.y : mn.y,
+                   pl.z > 0 ? mx.z : mn.z);
+      if (glm::dot(glm::vec3(pl), pv) + pl.w < 0) {
+        inside = false;
+        break;
+      }
+    }
+    if (!inside)
+      continue;
+    Mesh &m = kv.second;
+    cmd.bindVertexBuffers(0, {*m.buffer}, {m.vertexOffset});
+    cmd.bindIndexBuffer(*m.buffer, m.indexOffset, vk::IndexType::eUint32);
+    cmd.drawIndexed(m.indexCount, 1, 0, 0, 0);
   }
 
   // render imgui

@@ -86,6 +86,13 @@ private:
   std::vector<vk::raii::Semaphore> presentCompleteSemaphores;
   std::vector<vk::raii::Semaphore> renderFinishedSemaphores;
   std::vector<vk::raii::Fence> drawFences;
+
+  vk::raii::Buffer stagingBuffer{nullptr};
+  vk::raii::DeviceMemory stagingMemory{nullptr};
+  void *stagingMapped = nullptr;
+  static constexpr vk::DeviceSize stagingSize = 32 * 1024 * 1024;
+  void createStagingBuffer();
+
   std::vector<const char *> requiredDeviceExtension = {
       vk::KHRSwapchainExtensionName};
 
@@ -159,8 +166,7 @@ private:
   void recordCommandBuffer(vk::raii::CommandBuffer &cmd, uint32_t imageIndex,
                            uint32_t frameIndex);
   void transition_image_layout(vk::raii::CommandBuffer &cmd,
-                               uint32_t imageIndex,
-                               vk::ImageLayout old_layout,
+                               uint32_t imageIndex, vk::ImageLayout old_layout,
                                vk::ImageLayout new_layout,
                                vk::AccessFlags2 src_access_mask,
                                vk::AccessFlags2 dst_access_mask,
