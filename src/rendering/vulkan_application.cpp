@@ -94,7 +94,7 @@ void VulkanApplication::initVulkan() {
   biomeRegistry.loadFromDir("assets/biomes");
   std::print("loaded {} biomes\n", biomeRegistry.size());
 
-  camera = Camera(glm::vec3(24.0f, 20.0f, -8.0f), glm::vec3(0.0f, 1.0f, 0.0f),
+  camera = Camera(glm::vec3(24.0f, 80.0f, -8.0f), glm::vec3(0.0f, 1.0f, 0.0f),
                   108.0f, -35.0f);
   assetManager.loadDirectory("assets/");
 
@@ -129,7 +129,7 @@ void VulkanApplication::initVulkan() {
   initImGui();
 }
 
-const uint16_t RENDER_RADIUS = 16;
+const uint16_t RENDER_RADIUS = 32;
 
 void VulkanApplication::mainLoop() {
   float lastTime = 0.0f;
@@ -218,10 +218,11 @@ void VulkanApplication::requestGenJobs(const ChunkPos &playerChunk) {
   wanted.reserve(256);
   for (int radiusStep = 0; radiusStep <= RENDER_RADIUS; ++radiusStep)
     for (ChunkPos column : spiralAround(playerChunk, radiusStep)) {
-      int bottomY = playerChunk.y - 2;
-      if (bottomY > 0)
-        bottomY = 0;
-      for (int columnY = bottomY; columnY <= playerChunk.y; ++columnY) {
+      // Full-height columns: terrain spans 0..WORLD_TOP_Y, so always stream
+      // the whole stack instead of a window around the player. Skipped
+      // empty sky chunks resolve to known-empty and cost no mesh.
+      for (int columnY = WORLD_MIN_CHUNK_Y; columnY <= WORLD_MAX_CHUNK_Y;
+           ++columnY) {
         ChunkPos target{column.x, columnY, column.z};
         if (world.hasChunk(target) || world.isKnownEmpty(target))
           continue;

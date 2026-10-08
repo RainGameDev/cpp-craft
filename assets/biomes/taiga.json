@@ -1,0 +1,16 @@
+{
+  "name": "game:taiga",
+  "heightOffset": 0.5,
+  "terrace": 0.0,
+  "roughness": 1.15,
+  "topBlock": "game:podzol",
+  "subBlock": "game:dirt",
+  "subDepth": 3,
+  "stoneBlock": "game:stone",
+  "tempCenter": 0.1,
+  "tempRadius": 0.45,
+  "humidityCenter": 0.45,
+  "humidityRadius": 0.65,
+  "elevCenter": 58.0,
+  "elevRadius": 20.0
+}

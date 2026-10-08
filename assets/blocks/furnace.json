@@ -1,0 +1,9 @@
+{
+  "name": "game:furnace",
+  "opaque": true,
+  "solid": true,
+  "tickable": false,
+  "render": "cube",
+  "textures": { "all": "furnace" },
+  "components": { "BreakTime": 3.5, "Drops": ["game:item:furnace"] }
+}

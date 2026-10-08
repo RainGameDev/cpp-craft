@@ -1,0 +1,16 @@
+{
+  "name": "game:swamp",
+  "heightOffset": -1.5,
+  "terrace": 0.0,
+  "roughness": 0.35,
+  "topBlock": "game:mud",
+  "subBlock": "game:dirt",
+  "subDepth": 3,
+  "stoneBlock": "game:stone",
+  "tempCenter": 0.5,
+  "tempRadius": 0.35,
+  "humidityCenter": 0.9,
+  "humidityRadius": 0.4,
+  "elevCenter": 36.0,
+  "elevRadius": 8.0
+}

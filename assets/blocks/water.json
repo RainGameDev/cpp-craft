@@ -1,0 +1,9 @@
+{
+  "name": "game:water",
+  "opaque": false,
+  "solid": false,
+  "tickable": false,
+  "render": "transparent",
+  "textures": { "all": "water" },
+  "components": { "BreakTime": -1.0, "Drops": [] }
+}

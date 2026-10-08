@@ -60,7 +60,7 @@ void VulkanApplication::createGraphicsPipeline() {
 
   vk::PipelineMultisampleStateCreateInfo multisampling{
       .rasterizationSamples = vk::SampleCountFlagBits::e1,
-      .sampleShadingEnable = vk::True};
+      .sampleShadingEnable = vk::False};
 
   vk::PipelineDepthStencilStateCreateInfo depthStencil{
       .depthTestEnable = vk::True,
@@ -84,11 +84,11 @@ void VulkanApplication::createGraphicsPipeline() {
                                       vk::ShaderStageFlagBits::eVertex,
                                   .offset = 0,
                                   .size = sizeof(ChunkPush)};
-  vk::PipelineLayoutCreateInfo pipelineLayoutInfo{.setLayoutCount = 1,
-                                                  .pSetLayouts =
-                                                      &*descriptorSetLayout,
-                                                   .pushConstantRangeCount = 1,
-                                                  .pPushConstantRanges = &pushRange};
+  vk::PipelineLayoutCreateInfo pipelineLayoutInfo{
+      .setLayoutCount = 1,
+      .pSetLayouts = &*descriptorSetLayout,
+      .pushConstantRangeCount = 1,
+      .pPushConstantRanges = &pushRange};
 
   pipelineLayout = vk::raii::PipelineLayout(device, pipelineLayoutInfo);
 

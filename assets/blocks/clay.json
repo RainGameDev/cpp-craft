@@ -1,0 +1,9 @@
+{
+  "name": "game:clay",
+  "opaque": true,
+  "solid": true,
+  "tickable": false,
+  "render": "cube",
+  "textures": { "all": "Clay" },
+  "components": { "BreakTime": 0.6, "Drops": ["game:item:clay"] }
+}

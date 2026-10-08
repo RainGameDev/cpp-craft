@@ -34,7 +34,7 @@ void VulkanApplication::recordCommandBuffer(vk::raii::CommandBuffer &cmd,
                           vk::PipelineStageFlagBits2::eColorAttachmentOutput,
                           vk::PipelineStageFlagBits2::eColorAttachmentOutput);
 
-  vk::ClearValue clearColor = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f);
+  vk::ClearValue clearColor = vk::ClearColorValue(0.18f, 0.75f, 0.9f, 1.0f);
   vk::RenderingAttachmentInfo attachmentInfo = {
       .imageView = swapChainImageViews[imageIndex],
       .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
@@ -100,16 +100,18 @@ void VulkanApplication::recordCommandBuffer(vk::raii::CommandBuffer &cmd,
     if (!inside)
       continue;
     Mesh &m = kv.second;
-    if (!*m.buffer || m.indexCount == 0) continue;
+    if (!*m.buffer || m.indexCount == 0)
+      continue;
     const ChunkPush pc{.ox = p.x * CW,
                        .oy = p.y * CH,
                        .oz = p.z * CD,
                        .cols = atlas.columns,
                        .rows = atlas.rows};
-    cmd.pushConstants<uint32_t>(*pipelineLayout, vk::ShaderStageFlagBits::eVertex, 0,
-                      std::array<uint32_t, 5>{
-                          (uint32_t)pc.ox, (uint32_t)pc.oy, (uint32_t)pc.oz,
-                          (uint32_t)pc.cols, (uint32_t)pc.rows});
+    cmd.pushConstants<uint32_t>(
+        *pipelineLayout, vk::ShaderStageFlagBits::eVertex, 0,
+        std::array<uint32_t, 5>{(uint32_t)pc.ox, (uint32_t)pc.oy,
+                                (uint32_t)pc.oz, (uint32_t)pc.cols,
+                                (uint32_t)pc.rows});
     cmd.bindVertexBuffers(0, {*m.buffer}, {m.vertexOffset});
     cmd.bindIndexBuffer(*m.buffer, m.indexOffset, vk::IndexType::eUint32);
     cmd.drawIndexed(m.indexCount, 1, 0, 0, 0);

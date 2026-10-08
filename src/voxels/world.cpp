@@ -2,8 +2,54 @@
 #include "voxels/biome.h"
 #include "voxels/chunk_generator.h"
 #include "voxels/voxel_registry.h"
+#include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <random>
+
+namespace {
+constexpr float fbmRange(int octaves) {
+  float range = 0.0f;
+  float amplitude = 1.0f;
+  for (int octave = 0; octave < octaves; ++octave) {
+    range += amplitude;
+    amplitude *= 0.5f;
+  }
+  return range;
+}
+constexpr float RANGE_3 = fbmRange(3);
+constexpr float RANGE_4 = fbmRange(4);
+
+// Smooth gate for province / uplift masks.
+inline float smoothstep(float edge0, float edge1, float x) {
+  float t = std::clamp((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
+  return t * t * (3.0f - 2.0f * t);
+}
+// Mountain province tuning
+constexpr float RANGE_LO = 0.52f; // below this: no ranges, plains survive
+constexpr float RANGE_HI = 0.72f; // above this: full uplift, tall chains
+// Continental uplift
+constexpr float CONT_LO = 0.12f; // coasts stay flat
+constexpr float CONT_HI = 0.60f; // interiors take full ridges
+
+// Landform tuning Height is express
+constexpr float LAND_SCALE = 48.0f;  // +Y added at the wettest continent
+constexpr float OCEAN_SCALE = 24.0f; // -Y dropped at the deepest ocean
+constexpr float MOUNTAIN_SCALE =
+    165.0f;                          // height of a fully uplifted ridge crest
+constexpr float DETAIL_SCALE = 9.0f; // rolling hills and hollows
+constexpr float WARP_AMPLITUDE = 180.0f; // how far borders get pushed sideways
+constexpr float EROSION_FLAT = 0.15f;    // below this, full relief survives
+constexpr float EROSION_WIDTH = 0.40f;   // ramp up to fully worn flat
+
+// Climate tuning
+constexpr float CLIMATE_GAIN = 1.2f;
+constexpr float LAPSE_RATE = 0.012f;      // Y per unit of cooling
+constexpr float SNOW_ALTITUDE = 38.0f;    // cooling starts here
+constexpr float OROGRAPHIC_RATE = 0.008f; // drying per unit of altitude
+constexpr float DRY_ALTITUDE = 42.0f;
+constexpr float CONTINENT_BIAS = 0.60f;
+} // namespace
 
 World::World() {
 
@@ -13,44 +59,133 @@ World::World() {
   seed = newSeed;
 
   auto cSrc = FastNoise::New<FastNoise::Simplex>();
-  cSrc->SetScale(40.0f);
+  cSrc->SetScale(90.0f);
   caveNoise = FastNoise::New<FastNoise::FractalFBm>();
   caveNoise->SetSource(cSrc);
   caveNoise->SetOctaveCount(2);
 
   auto cSrc2 = FastNoise::New<FastNoise::Simplex>();
-  cSrc2->SetScale(20.0f);
+  cSrc2->SetScale(50.0f);
   caveNoise2 = FastNoise::New<FastNoise::FractalFBm>();
   caveNoise2->SetSource(cSrc2);
   caveNoise2->SetOctaveCount(4);
 
   auto bSrc = FastNoise::New<FastNoise::Simplex>();
-  bSrc->SetScale(10.0f);
+  bSrc->SetScale(25.0f);
   blobNoise = FastNoise::New<FastNoise::FractalFBm>();
   blobNoise->SetSource(bSrc);
   blobNoise->SetOctaveCount(4);
 
   auto eSrc = FastNoise::New<FastNoise::Simplex>();
-  eSrc->SetScale(20.0f);
+  eSrc->SetScale(50.0f);
   entranceNoise = FastNoise::New<FastNoise::FractalFBm>();
   entranceNoise->SetSource(eSrc);
   entranceNoise->SetOctaveCount(2);
 
-  auto heightSrc = FastNoise::New<FastNoise::Simplex>();
   simplex = FastNoise::New<FastNoise::Simplex>();
-  simplex->SetScale(100.0f);
+  simplex->SetScale(250.0f);
+
+  auto wSrc = FastNoise::New<FastNoise::Simplex>();
+  wSrc->SetScale(1500.0f);
+  warpNoise = FastNoise::New<FastNoise::FractalFBm>();
+  warpNoise->SetSource(wSrc);
+  warpNoise->SetOctaveCount(3);
+
+  auto kSrc = FastNoise::New<FastNoise::Simplex>();
+  kSrc->SetScale(3800.0f);
+  continentalNoise = FastNoise::New<FastNoise::FractalFBm>();
+  continentalNoise->SetSource(kSrc);
+  continentalNoise->SetOctaveCount(3);
+
+  auto rSrc = FastNoise::New<FastNoise::Simplex>();
+  rSrc->SetScale(1500.0f);
+  erosionNoise = FastNoise::New<FastNoise::FractalFBm>();
+  erosionNoise->SetSource(rSrc);
+  erosionNoise->SetOctaveCount(3);
+
+  auto pSrc = FastNoise::New<FastNoise::Simplex>();
+  pSrc->SetScale(900.0f);
+  peakNoise = FastNoise::New<FastNoise::FractalFBm>();
+  peakNoise->SetSource(pSrc);
+  peakNoise->SetOctaveCount(4);
+
+  auto gSrc = FastNoise::New<FastNoise::Simplex>();
+  gSrc->SetScale(2100.0f);
+  rangeNoise = FastNoise::New<FastNoise::FractalFBm>();
+  rangeNoise->SetSource(gSrc);
+  rangeNoise->SetOctaveCount(3);
+
+  auto dSrc = FastNoise::New<FastNoise::Simplex>();
+  dSrc->SetScale(180.0f);
+  detailNoise = FastNoise::New<FastNoise::FractalFBm>();
+  detailNoise->SetSource(dSrc);
+  detailNoise->SetOctaveCount(4);
 
   auto tSrc = FastNoise::New<FastNoise::Simplex>();
-  tSrc->SetScale(800.0f);
+  tSrc->SetScale(3000.0f);
   tempNoise = FastNoise::New<FastNoise::FractalFBm>();
   tempNoise->SetSource(tSrc);
   tempNoise->SetOctaveCount(3);
 
   auto hSrc = FastNoise::New<FastNoise::Simplex>();
-  hSrc->SetScale(800.0f);
+  hSrc->SetScale(2400.0f);
   humidityNoise = FastNoise::New<FastNoise::FractalFBm>();
   humidityNoise->SetSource(hSrc);
   humidityNoise->SetOctaveCount(3);
+}
+
+void World::warpCoordinates(float x, float z, float &warpedX,
+                            float &warpedZ) const {
+  warpedX = x + sample(warpNoise, x, z) * WARP_AMPLITUDE;
+  warpedZ = z + sample(warpNoise, x + 7919.0f, z + 104729.0f) * WARP_AMPLITUDE;
+}
+
+World::Column World::sampleColumn(float x, float z) const {
+  float warpedX, warpedZ;
+  warpCoordinates(x, z, warpedX, warpedZ);
+
+  // Continentalness decides where the coastline sits
+  float continental =
+      std::tanh(sample(continentalNoise, warpedX, warpedZ) / RANGE_3 * 1.2f +
+                CONTINENT_BIAS);
+
+  float base = SEA_LEVEL + (continental >= 0.0f ? continental * LAND_SCALE
+                                                : continental * OCEAN_SCALE);
+  base = std::max(base, MIN_SURFACE_Y);
+
+  float erosion =
+      sample(erosionNoise, warpedX, warpedZ) / RANGE_3 * 0.5f + 0.5f;
+  float worn = std::clamp((erosion - EROSION_FLAT) / EROSION_WIDTH, 0.0f, 1.0f);
+  float rugged = 1.0f - (worn * worn * (3.0f - 2.0f * worn));
+
+  float provinceRaw =
+      sample(rangeNoise, warpedX, warpedZ) / RANGE_3 * 0.5f + 0.5f;
+  float province = smoothstep(RANGE_LO, RANGE_HI, provinceRaw);
+
+  float continentUplift = smoothstep(CONT_LO, CONT_HI, continental);
+
+  float ridge = 1.0f - std::abs(sample(peakNoise, warpedX, warpedZ) / RANGE_4);
+  ridge = std::max(ridge, 0.0f);
+  ridge = ridge * ridge * ridge;
+  float mountains =
+      ridge * rugged * province * continentUplift * MOUNTAIN_SCALE;
+
+  Column column;
+  column.land = base + mountains;
+  column.detail =
+      sample(detailNoise, warpedX, warpedZ) / RANGE_4 * DETAIL_SCALE;
+
+  column.temperature = sample(tempNoise, warpedX, warpedZ) * CLIMATE_GAIN;
+  column.humidity = sample(humidityNoise, warpedX, warpedZ) * CLIMATE_GAIN;
+
+  column.temperature -=
+      std::max(0.0f, column.land - SNOW_ALTITUDE) * LAPSE_RATE;
+  column.humidity -=
+      std::max(0.0f, column.land - DRY_ALTITUDE) * OROGRAPHIC_RATE;
+
+  column.temperature = std::clamp(column.temperature, -1.0f, 1.0f);
+  column.humidity = std::clamp(column.humidity, -1.0f, 1.0f);
+  return column;
 }
 
 VoxelId World::getBlock(int worldX, int worldY, int worldZ) const {

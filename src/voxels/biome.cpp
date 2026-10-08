@@ -34,9 +34,9 @@ void BiomeRegistry::loadFromDir(const std::string &directory) {
 
     Biome biome;
     biome.name = biomeJson.at("name").get<std::string>();
-    biome.baseHeight = biomeJson.value("baseHeight", biome.baseHeight);
-    biome.amplitude = biomeJson.value("amplitude", biome.amplitude);
-    biome.frequency = biomeJson.value("frequency", biome.frequency);
+    biome.heightOffset = biomeJson.value("heightOffset", biome.heightOffset);
+    biome.terrace = biomeJson.value("terrace", biome.terrace);
+    biome.roughness = biomeJson.value("roughness", biome.roughness);
     biome.topBlock = biomeJson.value("topBlock", std::string("game:grass"));
     biome.subBlock = biomeJson.value("subBlock", std::string("game:dirt"));
     biome.subDepth = biomeJson.value("subDepth", biome.subDepth);
@@ -47,6 +47,8 @@ void BiomeRegistry::loadFromDir(const std::string &directory) {
         biomeJson.value("humidityCenter", biome.humidityCenter);
     biome.humidityRadius =
         biomeJson.value("humidityRadius", biome.humidityRadius);
+    biome.elevCenter = biomeJson.value("elevCenter", biome.elevCenter);
+    biome.elevRadius = biomeJson.value("elevRadius", biome.elevRadius);
 
     if (!byName.emplace(biome.name, std::move(biome)).second)
       throw std::runtime_error(
@@ -55,43 +57,68 @@ void BiomeRegistry::loadFromDir(const std::string &directory) {
   }
 }
 
-float BiomeRegistry::weightFor(const Biome &biome, float temp,
-                               float humidity) const {
+void BiomeRegistry::sharpen(std::vector<float> &weights) {
+  float total = 0.0f;
+  for (float weight : weights)
+    total += weight;
+  if (!(total > 0.0f))
+    return;
+
+  // Normalis
+  float sharpenedTotal = 0.0f;
+  for (float &weight : weights) {
+    weight = std::pow(weight / total, BIOME_SHARPNESS);
+    sharpenedTotal += weight;
+  }
+  if (!(sharpenedTotal > 0.0f))
+    return;
+  for (float &weight : weights)
+    weight /= sharpenedTotal;
+}
+
+float BiomeRegistry::weightFor(const Biome &biome, float temp, float humidity,
+                               float elevation) const {
   float tempRadius = biome.tempRadius;
   float humidityRadius = biome.humidityRadius;
   if (!(tempRadius > 1e-4f))
     tempRadius = 1e-4f;
   if (!(humidityRadius > 1e-4f))
     humidityRadius = 1e-4f;
+  float elevRadius = biome.elevRadius;
+  if (!(elevRadius > 1e-4f))
+    elevRadius = 1e4f;
+
   float tempDist = (temp - biome.tempCenter) / tempRadius;
   float humidityDist = (humidity - biome.humidityCenter) / humidityRadius;
-  return std::exp(-(tempDist * tempDist + humidityDist * humidityDist));
+  float elevDist = (elevation - biome.elevCenter) / elevRadius;
+  return std::exp(-(tempDist * tempDist + humidityDist * humidityDist +
+                    elevDist * elevDist));
 }
 
 std::vector<std::pair<const Biome *, float>>
-BiomeRegistry::weights(float temp, float humidity) const {
+BiomeRegistry::weights(float temp, float humidity, float elevation) const {
   std::vector<std::pair<const Biome *, float>> result;
   result.reserve(byName.size());
-  float total = 0.0f;
+  std::vector<float> raw;
+  raw.reserve(byName.size());
   for (const auto &entry : byName) {
-    float w = weightFor(entry.second, temp, humidity);
-    result.emplace_back(&entry.second, w);
-    total += w;
+    result.emplace_back(&entry.second, 0.0f);
+    raw.push_back(weightFor(entry.second, temp, humidity, elevation));
   }
-  if (total > 0.0f) {
-    for (auto &entry : result)
-      entry.second /= total;
-  }
+  sharpen(raw);
+  for (size_t index = 0; index < result.size(); ++index)
+    result[index].second = raw[index];
   return result;
 }
 
-const Biome &BiomeRegistry::pick(float temp, float humidity) const {
+const Biome &BiomeRegistry::pick(float temp, float humidity,
+                                 float elevation) const {
   if (byName.empty())
     throw std::runtime_error("no biomes loaded");
   const Biome *best = nullptr;
   float bestWeight = -1.0f;
   for (const auto &entry : byName) {
-    float w = weightFor(entry.second, temp, humidity);
+    float w = weightFor(entry.second, temp, humidity, elevation);
     if (w > bestWeight) {
       bestWeight = w;
       best = &entry.second;

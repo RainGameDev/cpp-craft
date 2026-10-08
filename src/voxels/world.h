@@ -3,6 +3,7 @@
 #include "voxels/chunk.h"
 #include "voxels/voxel_def.h"
 #include <FastNoise/FastNoise.h>
+#include <cmath>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -21,6 +22,13 @@ inline int floorMod(int value, int divisor) {
 class VoxelRegistry;
 class BiomeRegistry;
 
+inline constexpr float SEA_LEVEL = 32.0f;
+inline constexpr float SNOW_LINE = 130.0f;
+inline constexpr float MIN_SURFACE_Y = 5.0f;
+inline constexpr int WORLD_MIN_CHUNK_Y = 0;
+inline constexpr int WORLD_MAX_CHUNK_Y = 7;
+inline constexpr float WORLD_TOP_Y = (float)((WORLD_MAX_CHUNK_Y + 1) * 32);
+
 class World {
   std::unordered_map<ChunkPos, Chunk, ChunkPosHash> storedChunks;
   std::unordered_set<ChunkPos, ChunkPosHash> knownEmptyChunks;
@@ -33,7 +41,17 @@ class World {
   FastNoise::SmartNode<FastNoise::FractalFBm> caveNoise2;
   FastNoise::SmartNode<FastNoise::FractalFBm> blobNoise;
   FastNoise::SmartNode<FastNoise::FractalFBm> entranceNoise;
+  // Landform layers
+  FastNoise::SmartNode<FastNoise::FractalFBm> warpNoise;
+  FastNoise::SmartNode<FastNoise::FractalFBm> continentalNoise;
+  FastNoise::SmartNode<FastNoise::FractalFBm> erosionNoise;
+  FastNoise::SmartNode<FastNoise::FractalFBm> peakNoise;
+  FastNoise::SmartNode<FastNoise::FractalFBm> rangeNoise;
+  FastNoise::SmartNode<FastNoise::FractalFBm> detailNoise;
+
   void markNeighborDirty(ChunkPos chunkPos);
+
+  void warpCoordinates(float x, float z, float &warpedX, float &warpedZ) const;
 
 public:
   float caveAt2(float x, float y, float z) const {
@@ -51,6 +69,14 @@ public:
   float entranceAt(float x, float z) const {
     return sample(entranceNoise, x, z);
   }
+
+  struct Column {
+    float land;
+    float detail;
+    float temperature;
+    float humidity;
+  };
+  Column sampleColumn(float x, float z) const;
 
   explicit World();
   int seedValue() const { return seed; }
@@ -97,14 +123,10 @@ public:
   void evictEmpty(ChunkPos chunkPos) { knownEmptyChunks.erase(chunkPos); }
   void evictEmptyBeyond(ChunkPos playerChunk, int radius);
   void markKnownEmpty(ChunkPos chunkPos) { knownEmptyChunks.insert(chunkPos); }
-  // Insert a worker generated chunk on the main thread. Returns false if a
-  // chunk (for example a player edit) or known empty marker covers this pos.
   bool publishGeneratedChunk(Chunk &&chunk);
   void removeChunk(ChunkPos chunkPos) { storedChunks.erase(chunkPos); }
   auto &allChunks() { return storedChunks; }
   const auto &allChunks() const { return storedChunks; }
-
-  // AIR when chunk is missing (treat unloaded as empty for meshing).
   VoxelId getBlock(int worldX, int worldY, int worldZ) const;
   void setBlock(int worldX, int worldY, int worldZ, VoxelId voxelId);
 };

@@ -1,0 +1,16 @@
+{
+  "name": "game:icecaps",
+  "heightOffset": 0.0,
+  "terrace": 0.0,
+  "roughness": 0.7,
+  "topBlock": "game:ice",
+  "subBlock": "game:snow",
+  "subDepth": 2,
+  "stoneBlock": "game:stone",
+  "tempCenter": -0.75,
+  "tempRadius": 0.26,
+  "humidityCenter": 0.4,
+  "humidityRadius": 0.45,
+  "elevCenter": 38.0,
+  "elevRadius": 16.0
+}

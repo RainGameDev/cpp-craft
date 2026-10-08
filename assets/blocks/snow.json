@@ -1,0 +1,9 @@
+{
+  "name": "game:snow",
+  "opaque": true,
+  "solid": true,
+  "tickable": false,
+  "render": "cube",
+  "textures": { "all": "Snow" },
+  "components": { "BreakTime": 0.2, "Drops": [] }
+}

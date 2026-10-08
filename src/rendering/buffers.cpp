@@ -192,8 +192,8 @@ void VulkanApplication::drainCompletedMeshes(int budget) {
           best = idx;
         }
       }
-      job = std::move(completedMeshes[best]);
-      completedMeshes.erase(completedMeshes.begin() + (long)best);
+      job = std::move(completedMeshes.front());
+      completedMeshes.pop_front();
     }
 
     Chunk *chunk = world.getChunk(job.pos);

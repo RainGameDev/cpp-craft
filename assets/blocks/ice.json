@@ -1,0 +1,9 @@
+{
+  "name": "game:ice",
+  "opaque": false,
+  "solid": true,
+  "tickable": false,
+  "render": "transparent",
+  "textures": { "all": "Ice" },
+  "components": { "BreakTime": 0.5, "Drops": [] }
+}

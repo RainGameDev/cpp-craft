@@ -1,0 +1,9 @@
+{
+  "name": "game:sand",
+  "opaque": true,
+  "solid": true,
+  "tickable": false,
+  "render": "cube",
+  "textures": { "all": "Sand" },
+  "components": { "BreakTime": 0.5, "Drops": ["game:item:sand"] }
+}

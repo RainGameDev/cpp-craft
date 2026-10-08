@@ -1,0 +1,16 @@
+{
+  "name": "game:desert",
+  "heightOffset": -0.5,
+  "terrace": 0.0,
+  "roughness": 1.1,
+  "topBlock": "game:sand",
+  "subBlock": "game:sand",
+  "subDepth": 4,
+  "stoneBlock": "game:stone",
+  "tempCenter": 0.75,
+  "tempRadius": 0.4,
+  "humidityCenter": -0.5,
+  "humidityRadius": 0.5,
+  "elevCenter": 42.0,
+  "elevRadius": 15.0
+}

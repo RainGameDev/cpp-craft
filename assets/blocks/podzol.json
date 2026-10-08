@@ -1,0 +1,9 @@
+{
+  "name": "game:podzol",
+  "opaque": true,
+  "solid": true,
+  "tickable": false,
+  "render": "cube",
+  "textures": { "all": "PozolSide", "top": "Podzol", "bottom": "dirt" },
+  "components": { "BreakTime": 0.6, "Drops": ["game:item:dirt"] }
+}

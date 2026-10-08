@@ -1,0 +1,16 @@
+{
+  "name": "game:tundra",
+  "heightOffset": -0.5,
+  "terrace": 0.0,
+  "roughness": 0.9,
+  "topBlock": "game:snow",
+  "subBlock": "game:dirt",
+  "subDepth": 3,
+  "stoneBlock": "game:stone",
+  "tempCenter": -0.55,
+  "tempRadius": 0.3,
+  "humidityCenter": 0.0,
+  "humidityRadius": 0.6,
+  "elevCenter": 40.0,
+  "elevRadius": 18.0
+}

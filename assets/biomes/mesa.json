@@ -1,0 +1,16 @@
+{
+  "name": "game:mesa",
+  "heightOffset": 2.0,
+  "terrace": 0.6,
+  "roughness": 0.7,
+  "topBlock": "game:redsand",
+  "subBlock": "game:redsand",
+  "subDepth": 4,
+  "stoneBlock": "game:stone",
+  "tempCenter": 0.55,
+  "tempRadius": 0.4,
+  "humidityCenter": -0.2,
+  "humidityRadius": 0.45,
+  "elevCenter": 65.0,
+  "elevRadius": 18.0
+}

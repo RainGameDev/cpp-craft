@@ -1,14 +1,16 @@
 {
   "name": "game:mountains",
-  "baseHeight": 18.0,
-  "amplitude": 74.0,
-  "frequency": 0.003,
+  "heightOffset": 1.0,
+  "terrace": 0.0,
+  "roughness": 1.5,
   "topBlock": "game:grass",
   "subBlock": "game:dirt",
   "subDepth": 3,
   "stoneBlock": "game:stone",
-  "tempCenter": 0.6,
-  "tempRadius": 0.35,
+  "tempCenter": 0.3,
+  "tempRadius": 1.4,
   "humidityCenter": 0.0,
-  "humidityRadius": 10.0
+  "humidityRadius": 1.4,
+  "elevCenter": 150.0,
+  "elevRadius": 55.0
 }

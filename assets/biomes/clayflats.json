@@ -1,0 +1,16 @@
+{
+  "name": "game:clayflats",
+  "heightOffset": -1.0,
+  "terrace": 0.0,
+  "roughness": 0.4,
+  "topBlock": "game:clay",
+  "subBlock": "game:clay",
+  "subDepth": 3,
+  "stoneBlock": "game:stone",
+  "tempCenter": 0.3,
+  "tempRadius": 0.35,
+  "humidityCenter": 0.0,
+  "humidityRadius": 0.35,
+  "elevCenter": 40.0,
+  "elevRadius": 12.0
+}

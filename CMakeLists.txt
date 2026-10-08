@@ -81,6 +81,12 @@ if (MSVC)
     target_compile_options(minecraft PRIVATE /W4)
 else()
     target_compile_options(minecraft PRIVATE -Wall -Wextra -Wpedantic)
+    target_compile_options(minecraft PRIVATE $<$<CONFIG:Release>:-march=native>)
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT ipo_ok OUTPUT ipo_msg)
+    if (ipo_ok)
+        set_property(TARGET minecraft PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+    endif()
 endif()
 
 add_custom_command(TARGET minecraft POST_BUILD
