@@ -80,10 +80,15 @@ void VulkanApplication::createGraphicsPipeline() {
       .attachmentCount = 1,
       .pAttachments = &colorBlendAttachment};
 
+  vk::PushConstantRange pushRange{.stageFlags =
+                                      vk::ShaderStageFlagBits::eVertex,
+                                  .offset = 0,
+                                  .size = sizeof(ChunkPush)};
   vk::PipelineLayoutCreateInfo pipelineLayoutInfo{.setLayoutCount = 1,
                                                   .pSetLayouts =
                                                       &*descriptorSetLayout,
-                                                  .pushConstantRangeCount = 0};
+                                                   .pushConstantRangeCount = 1,
+                                                  .pPushConstantRanges = &pushRange};
 
   pipelineLayout = vk::raii::PipelineLayout(device, pipelineLayoutInfo);
 

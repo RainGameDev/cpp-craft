@@ -43,10 +43,6 @@ MeshData meshChunkSnapshot(const ChunkMeshSnapshot &snapshot,
   MeshData mesh;
   mesh.reserve(8192, 12288);
 
-  const int baseX = snapshot.central.pos.x * CW;
-  const int baseY = snapshot.central.pos.y * CH;
-  const int baseZ = snapshot.central.pos.z * CD;
-
   for (int localY = 0; localY < CH; ++localY)
     for (int localZ = 0; localZ < CD; ++localZ)
       for (int localX = 0; localX < CW; ++localX) {
@@ -74,15 +70,14 @@ MeshData meshChunkSnapshot(const ChunkMeshSnapshot &snapshot,
           const uint32_t baseVertex =
               static_cast<uint32_t>(mesh.vertices.size());
           const auto &cell = def.textureCoords[f];
+          const uint32_t tile =
+              (uint32_t)(cell[1] * atlasLayout.columns + cell[0]);
           for (int c = 0; c < 4; ++c) {
-            Vertex v;
-            v.pos = glm::vec3(baseX + localX + face.corners[c][0],
-                              baseY + localY + face.corners[c][1],
-                              baseZ + localZ + face.corners[c][2]);
-            v.shade = face.shade;
-            v.uv = glm::vec2((cell[0] + FACE_UV[c][0]) / atlasLayout.columns,
-                             (cell[1] + FACE_UV[c][1]) / atlasLayout.rows);
-            mesh.vertices.push_back(v);
+            mesh.vertices.push_back(Vertex::pack(
+                (uint32_t)(localX + face.corners[c][0]),
+                (uint32_t)(localY + face.corners[c][1]),
+                (uint32_t)(localZ + face.corners[c][2]), (uint32_t)f, tile,
+                (uint32_t)c));
           }
           mesh.indices.insert(mesh.indices.end(),
                               {baseVertex, baseVertex + 1, baseVertex + 2,

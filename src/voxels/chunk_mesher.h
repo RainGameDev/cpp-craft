@@ -117,20 +117,14 @@ MeshData meshChunkWithGetter(const Chunk &chunk, F &&getBlock,
           const uint32_t baseVertex =
               static_cast<uint32_t>(mesh.vertices.size());
           const auto &atlasCell = voxelDef.textureCoords[faceIndex];
-          const float inset = 0.0;
-          const float span = 1.0f - 2.0f * inset;
+          const uint32_t tile =
+              (uint32_t)(atlasCell[1] * atlasLayout.columns + atlasCell[0]);
           for (int cornerIndex = 0; cornerIndex < 4; ++cornerIndex) {
-            Vertex vertex;
-            vertex.pos = glm::vec3(worldX + face.corners[cornerIndex][0],
-                                   worldY + face.corners[cornerIndex][1],
-                                   worldZ + face.corners[cornerIndex][2]);
-            vertex.shade = face.shade;
-            vertex.uv = glm::vec2(
-                (atlasCell[0] + inset + FACE_UV[cornerIndex][0] * span) /
-                    atlasLayout.columns,
-                (atlasCell[1] + inset + FACE_UV[cornerIndex][1] * span) /
-                    atlasLayout.rows);
-            mesh.vertices.push_back(vertex);
+            mesh.vertices.push_back(Vertex::pack(
+                (uint32_t)(localX + face.corners[cornerIndex][0]),
+                (uint32_t)(localY + face.corners[cornerIndex][1]),
+                (uint32_t)(localZ + face.corners[cornerIndex][2]),
+                (uint32_t)faceIndex, tile, (uint32_t)cornerIndex));
           }
           mesh.indices.insert(mesh.indices.end(),
                               {baseVertex, baseVertex + 1, baseVertex + 2,

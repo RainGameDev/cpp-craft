@@ -2,6 +2,7 @@
 #include "imgui_impl_vulkan.h"
 #include "rendering/vulkan_application.h"
 
+#include <array>
 #include <cstdint>
 
 void VulkanApplication::createCommandPool() {
@@ -81,6 +82,7 @@ void VulkanApplication::recordCommandBuffer(vk::raii::CommandBuffer &cmd,
   for (auto &pl : planes)
     pl /= glm::length(glm::vec3(pl));
 
+  const AtlasLayout atlas = voxelAtlas.layout();
   constexpr float pad = 2.0f;
   for (auto &kv : chunkMeshes) {
     const ChunkPos &p = kv.first;
@@ -99,6 +101,15 @@ void VulkanApplication::recordCommandBuffer(vk::raii::CommandBuffer &cmd,
       continue;
     Mesh &m = kv.second;
     if (!*m.buffer || m.indexCount == 0) continue;
+    const ChunkPush pc{.ox = p.x * CW,
+                       .oy = p.y * CH,
+                       .oz = p.z * CD,
+                       .cols = atlas.columns,
+                       .rows = atlas.rows};
+    cmd.pushConstants<uint32_t>(*pipelineLayout, vk::ShaderStageFlagBits::eVertex, 0,
+                      std::array<uint32_t, 5>{
+                          (uint32_t)pc.ox, (uint32_t)pc.oy, (uint32_t)pc.oz,
+                          (uint32_t)pc.cols, (uint32_t)pc.rows});
     cmd.bindVertexBuffers(0, {*m.buffer}, {m.vertexOffset});
     cmd.bindIndexBuffer(*m.buffer, m.indexOffset, vk::IndexType::eUint32);
     cmd.drawIndexed(m.indexCount, 1, 0, 0, 0);
